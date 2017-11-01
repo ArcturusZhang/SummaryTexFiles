@@ -9,6 +9,7 @@ import java.util.regex.Pattern;
 public class TexProcess {
     private final static String ORIGINAL_FOLDER_NAME = "originalTexes";
     private static int warningCount = 0;
+    private static String headerPath = "." + File.separator + "parts" + File.separator + "header.tex";
 
     public static void main(String[] args) {
         String mainFileName;
@@ -31,7 +32,7 @@ public class TexProcess {
                 }
             }
         }
-        // sort the trimed tex file
+        // sort the trimmed tex file
         TreeMap<String, List<File>> map = new TreeMap<>();
         for (File file : currentFolder.listFiles()) {
             if (file.isDirectory()) {
@@ -61,8 +62,9 @@ public class TexProcess {
 
     /**
      * Decorate a String of certain length.
-     * @param string
-     * @return
+     *
+     * @param string string need decorate
+     * @return decorated string.
      */
     private static String decorateSection(String string) {
         String separator;
@@ -94,12 +96,16 @@ public class TexProcess {
      * Second tweak the section and subsection title (if needed), adding separator between every pair of adjacent characters.
      * Third tweak the includegraphics line. Ensure the existence of the figure intended to include, calculate and correct
      * the width of the figure. Print warnings if the figure file does not exist or the figure file duplicates.
+     *
      * @param trimmedFile
      */
     private static void decorateTrimmedFile(File trimmedFile) {
         BufferedReader reader = null;
         BufferedWriter writer = null;
         StringBuilder content = new StringBuilder();
+        StringBuilder chapterInfo = new StringBuilder();
+        File headerFile = new File(headerPath);
+        if (!headerFile.exists()) throw new RuntimeException("Need header file:" + headerFile.getPath());
         try {
             reader = new BufferedReader(new InputStreamReader(new FileInputStream(trimmedFile), "UTF-8"));
             String line;
@@ -111,6 +117,7 @@ public class TexProcess {
                 Pattern subsectionPattern = Pattern.compile("^(\\s*\\\\subsection)\\{(\\W+)\\}(\\s*)$");
                 int lineNumber = 1;
                 File figureFolder = new File("." + File.separator + "fig");
+                boolean flag = false;
                 while ((line = reader.readLine()) != null) {
                     // decorate the chapter line
                     Matcher chapterMatcher = chapterPattern.matcher(line);
@@ -136,70 +143,75 @@ public class TexProcess {
                             newChapterSB.append("{").append(newTitle).append("}");
                             line = newChapterSB.toString();
                         } else {
-                            System.out.println("INFO--title error (ignore this if title exists) at line " + lineNumber + " of file " + trimmedFile.getPath());
+                            System.out.println("INFO--title error (ignore this if title exists) at line " + lineNumber
+                                    + " of file " + trimmedFile.getPath());
                         }
-                    }
-                    // uncomment the following if needed
-//                    // decorate section title
-//                    Matcher sectionMatcher = sectionPattern.matcher(line);
-//                    if (sectionMatcher.find()) {
-//                        line = sectionMatcher.group(1) + "{" + decorateSection(sectionMatcher.group(2)) + "}"
-//                                + sectionMatcher.group(3);
-//                    }
-//                    // decorate subsection title
-//                    Matcher subsectionMatcher = subsectionPattern.matcher(line);
-//                    if (subsectionMatcher.find()) {
-//                        line = subsectionMatcher.group(1) + "{" + decorateSection(subsectionMatcher.group(2)) + "}"
-//                                + subsectionMatcher.group(3);
-//                        System.out.println(line);
-//                    }
-                    // extract the figure filename and its width or height
-                    Matcher filenameMatcher = filenamePattern.matcher(line);
-                    if (filenameMatcher.find()) {
-                        String picFilePath = filenameMatcher.group(5);
-                        String postfix = filenameMatcher.group(6);
-                        int braceCount = countEndingBraces(picFilePath);
-                        if (braceCount != 0) {
-                            postfix = picFilePath.substring(picFilePath.length() - braceCount) + postfix;
-                            picFilePath = picFilePath.substring(0, picFilePath.length() - braceCount);
+                        chapterInfo.append(line).append("\n").append("\\input{")
+                                .append(headerFile.getPath().replace("\\", "/")).append("}\n");
+                    } else {
+                        // decorate section title
+                        Matcher sectionMatcher = sectionPattern.matcher(line);
+                        if (sectionMatcher.find()) {
+                            line = sectionMatcher.group(1) + "{" + decorateSection(sectionMatcher.group(2)) + "}"
+                                    + sectionMatcher.group(3);
                         }
-                        File picFile = new File(picFilePath);
-                        List<File> picList = findByFileName(figureFolder, picFile.getName());
-                        if (picList.size() != 1) {
-                            if (picList.isEmpty())
-                                System.out.println("WARNING--picture file not found: " + picFile.getName() + " at line " + lineNumber + " of file " + trimmedFile.getPath());
-                            else {
-                                System.out.println("WARNING--duplicated picture file: " + picFile.getName() + " at line " + lineNumber + " of file " + trimmedFile.getPath());
+                        // decorate subsection title
+                        Matcher subsectionMatcher = subsectionPattern.matcher(line);
+                        if (subsectionMatcher.find()) {
+                            line = subsectionMatcher.group(1) + "{" + decorateSection(subsectionMatcher.group(2)) + "}"
+                                    + subsectionMatcher.group(3);
+                        }
+                        // extract the figure filename and its width or height
+                        Matcher filenameMatcher = filenamePattern.matcher(line);
+                        if (filenameMatcher.find()) {
+                            String picFilePath = filenameMatcher.group(5);
+                            String postfix = filenameMatcher.group(6);
+                            int braceCount = countEndingBraces(picFilePath);
+                            if (braceCount != 0) {
+                                postfix = picFilePath.substring(picFilePath.length() - braceCount) + postfix;
+                                picFilePath = picFilePath.substring(0, picFilePath.length() - braceCount);
                             }
-                            warningCount++;
-                        } else {
-                            StringBuilder newline = new StringBuilder();
-                            File newPicFile = picList.get(0);
-                            String newFilePath = newPicFile.getPath().replace('\\', '/');
-                            String newSize;
-                            Matcher sizeMatcher = sizePattern.matcher(newFilePath);
-                            // get the size information for the picture file
-                            if (sizeMatcher.find()) {
-                                // this file has size info
-                                newSize = getWidth(Integer.valueOf(sizeMatcher.group(1))) + "cm";
-                            } else {
-                                // this file does not have size info
-                                System.out.println("WARNING--picture file: " + picFile.getName() + " does not have size info at line " + lineNumber + " of file " + trimmedFile.getPath());
+                            File picFile = new File(picFilePath);
+                            List<File> picList = findByFileName(figureFolder, picFile.getName());
+                            if (picList.size() != 1) {
+                                if (picList.isEmpty())
+                                    System.out.println("WARNING--picture file not found: " + picFile.getName() + " at line " + lineNumber + " of file " + trimmedFile.getPath());
+                                else {
+                                    System.out.println("WARNING--duplicated picture file: " + picFile.getName() + " at line " + lineNumber + " of file " + trimmedFile.getPath());
+                                }
                                 warningCount++;
-                                newSize = filenameMatcher.group(3);
+                            } else {
+                                StringBuilder newline = new StringBuilder();
+                                File newPicFile = picList.get(0);
+                                String newFilePath = newPicFile.getPath().replace('\\', '/');
+                                String newSize;
+                                Matcher sizeMatcher = sizePattern.matcher(newFilePath);
+                                // get the size information for the picture file
+                                if (sizeMatcher.find()) {
+                                    // this file has size info
+                                    newSize = getWidth(Integer.valueOf(sizeMatcher.group(1))) + "cm";
+                                } else {
+                                    // this file does not have size info
+                                    System.out.println("WARNING--picture file: " + picFile.getName() + " does not have size info at line " + lineNumber + " of file " + trimmedFile.getPath());
+                                    warningCount++;
+                                    newSize = filenameMatcher.group(3);
+                                }
+                                newline.append(filenameMatcher.group(1)).append(newSize).append(filenameMatcher.group(4))
+                                        .append(newFilePath).append(postfix);
+                                line = newline.toString();
                             }
-                            newline.append(filenameMatcher.group(1)).append(newSize).append(filenameMatcher.group(4))
-                                    .append(newFilePath).append(postfix);
-                            line = newline.toString();
+                        }
+                        if (!line.trim().startsWith("\\input")) {
+                            content.append(line).append("\n");
                         }
                     }
-                    content.append(line).append("\n");
                     lineNumber++;
                 }
             } catch (IOException e) {
                 e.printStackTrace();
             }
             writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(trimmedFile), "UTF-8"));
+            content = chapterInfo.append(content);
             writer.write(content.toString());
         } catch (IOException e) {
             e.printStackTrace();
@@ -223,6 +235,7 @@ public class TexProcess {
 
     /**
      * Count how many of '}' at the end of the given String.
+     *
      * @param path
      * @return the count of '}' at the end of path.
      */
@@ -238,7 +251,8 @@ public class TexProcess {
 
     /**
      * Recursively find the file with certain name in the given folder, return the result in a list of Files.
-     * @param folder the folder is to be searched
+     *
+     * @param folder   the folder is to be searched
      * @param filename the target file name
      * @return a list of found files
      */
@@ -257,6 +271,7 @@ public class TexProcess {
 
     /**
      * A formula to calculate the width of figure with certain size.
+     *
      * @param size
      * @return
      */
@@ -268,6 +283,7 @@ public class TexProcess {
     /**
      * Generate the main tex file using the map of part name and the corresponding list of tex files.
      * Inject the file names into the main file at certain position.
+     *
      * @param mainFile
      * @param map
      */
@@ -287,15 +303,15 @@ public class TexProcess {
             reader = new BufferedReader(new InputStreamReader(new FileInputStream(mainFile), "UTF-8"));
             String line;
             try {
-                boolean flag = true;
+                boolean injectionFlag = true;
                 while ((line = reader.readLine()) != null) {
                     if (line.trim().startsWith("%!!!ContentEnd")) {
-                        flag = true;
+                        injectionFlag = true;
                     }
-                    if (flag) content.append(line).append("\n");
+                    if (injectionFlag) content.append(line).append("\n");
                     if (line.trim().startsWith("%!!!ContentStart")) {
                         content.append(injectContent);
-                        flag = false;
+                        injectionFlag = false;
                     }
                 }
             } catch (IOException e) {
@@ -326,6 +342,7 @@ public class TexProcess {
     /**
      * Returns a list of raw tex files in the given folder.
      * A raw tex files is a file with the extension name of "tex", and whose filename does not ended with "-trim".
+     *
      * @param folder
      * @return
      */
@@ -343,14 +360,15 @@ public class TexProcess {
      * Returns a sorted list of trimmed tex files in the given folder.
      * A trimmed tex file is a file whose full name ended with "-trim.tex".
      * The list is sorted by the ordinal number which is contained in the filename.
+     *
      * @param folder
      * @return
      */
     private static List<File> getTrimmedTexFileInFolder(File folder) {
         List<File> files = new ArrayList<>();
-        for (File trimedFile : folder.listFiles()) {
-            if (trimedFile.getName().endsWith("-trim.tex")) {
-                files.add(trimedFile);
+        for (File trimmedFile : folder.listFiles()) {
+            if (trimmedFile.getName().endsWith("-trim.tex")) {
+                files.add(trimmedFile);
             }
         }
         files.sort((File file1, File file2) -> {
@@ -369,6 +387,7 @@ public class TexProcess {
     /**
      * Copy the content within "\begin{document}" and "\end{document}" in a raw tex file to the trimmed tex file.
      * The title in raw tex files is renamed to chapter in trimmed tex files.
+     *
      * @param texFile
      * @return
      */
