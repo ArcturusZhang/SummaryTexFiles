@@ -6,12 +6,14 @@ import java.util.TreeMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-public class TexProcess {
+public class TexProcessOld {
     private final static String ORIGINAL_FOLDER_NAME = "originalTexes";
     private static int warningCount = 0;
     private static String headerPath = "." + File.separator + "parts" + File.separator + "header.tex";
+    static PrintStream log;
 
-    public static void main(String[] args) {
+    public static void process(String[] args) {
+        log = System.out;
         String mainFileName;
         if (args.length == 0) {
             mainFileName = "Calculus_lecture_HighDimension.tex";
@@ -51,13 +53,13 @@ public class TexProcess {
             }
         }
         generateMainFile(mainFile, map);
-        System.out.print("All done");
+        log.print("All done");
         if (warningCount != 0) {
-            System.out.print(" with " + warningCount + " warning(s)");
+            log.print(" with " + warningCount + " warning(s)");
         } else {
-            System.out.print(" without warnings");
+            log.print(" without warnings");
         }
-        System.out.println(". ");
+        log.println(". ");
     }
 
     /**
@@ -66,7 +68,7 @@ public class TexProcess {
      * @param string string need decorate
      * @return decorated string.
      */
-    private static String decorateSection(String string) {
+    static String decorateSection(String string) {
         String separator;
         switch (string.length()) {
             case 2:
@@ -102,7 +104,7 @@ public class TexProcess {
      *
      * @param trimmedFile
      */
-    private static void decorateTrimmedFile(File trimmedFile) {
+    static void decorateTrimmedFile(File trimmedFile) {
         BufferedReader reader = null;
         BufferedWriter writer = null;
         StringBuilder content = new StringBuilder();
@@ -146,7 +148,7 @@ public class TexProcess {
                             newChapterSB.append("{").append(newTitle).append("}");
                             line = newChapterSB.toString();
                         } else {
-                            System.out.println("INFO--title error (ignore this if title exists) at line " + lineNumber
+                            log.println("INFO--title error (ignore this if title exists) at line " + lineNumber
                                     + " of file " + trimmedFile.getPath());
                         }
                         chapterInfo.append(line).append("\n").append("\\input{")
@@ -178,9 +180,9 @@ public class TexProcess {
                             List<File> picList = findByFileName(figureFolder, picFile.getName());
                             if (picList.size() != 1) {
                                 if (picList.isEmpty())
-                                    System.out.println("WARNING--picture file not found: " + picFile.getName() + " at line " + lineNumber + " of file " + trimmedFile.getPath());
+                                    log.println("WARNING--picture file not found: " + picFile.getName() + " at line " + lineNumber + " of file " + trimmedFile.getPath());
                                 else {
-                                    System.out.println("WARNING--duplicated picture file: " + picFile.getName() + " at line " + lineNumber + " of file " + trimmedFile.getPath());
+                                    log.println("WARNING--duplicated picture file: " + picFile.getName() + " at line " + lineNumber + " of file " + trimmedFile.getPath());
                                 }
                                 warningCount++;
                             } else {
@@ -195,7 +197,7 @@ public class TexProcess {
                                     newSize = getWidth(Integer.valueOf(sizeMatcher.group(1))) + "cm";
                                 } else {
                                     // this file does not have size info
-                                    System.out.println("WARNING--picture file: " + picFile.getName() + " does not have size info at line " + lineNumber + " of file " + trimmedFile.getPath());
+                                    log.println("WARNING--picture file: " + picFile.getName() + " does not have size info at line " + lineNumber + " of file " + trimmedFile.getPath());
                                     warningCount++;
                                     newSize = filenameMatcher.group(3);
                                 }
@@ -242,7 +244,7 @@ public class TexProcess {
      * @param path
      * @return the count of '}' at the end of path.
      */
-    private static int countEndingBraces(String path) {
+    static int countEndingBraces(String path) {
         int pos = path.length() - 1;
         int braceCount = 0;
         while (path.charAt(pos) == '}') {
@@ -259,7 +261,7 @@ public class TexProcess {
      * @param filename the target file name
      * @return a list of found files
      */
-    private static List<File> findByFileName(File folder, String filename) {
+    static List<File> findByFileName(File folder, String filename) {
         List<File> foundList = new ArrayList<>();
         for (File file : folder.listFiles()) {
             if (file.isDirectory()) foundList.addAll(findByFileName(file, filename));
@@ -278,7 +280,7 @@ public class TexProcess {
      * @param size
      * @return
      */
-    private static String getWidth(int size) {
+    static String getWidth(int size) {
         double width = 13.0 / 500 * size;
         return String.format("%.2f", width);
     }
@@ -290,13 +292,13 @@ public class TexProcess {
      * @param mainFile
      * @param map
      */
-    private static void generateMainFile(File mainFile, TreeMap<String, List<File>> map) {
+    static void generateMainFile(File mainFile, TreeMap<String, List<File>> map) {
         StringBuilder injectContent = new StringBuilder();
         Iterator<String> iterator = map.keySet().iterator();
         while (iterator.hasNext()) {
             for (File texFile : map.get(iterator.next())) {
                 injectContent.append("\\input{").append(texFile.getPath().replace('\\', '/')).append("}\n");
-                System.out.println("File: " + texFile.getPath() + " injected into main file.");
+                log.println("File: " + texFile.getPath() + " injected into main file.");
             }
         }
         BufferedReader reader = null;
@@ -349,7 +351,7 @@ public class TexProcess {
      * @param folder
      * @return
      */
-    private static List<File> getTexFilesInFolder(File folder) {
+    static List<File> getTexFilesInFolder(File folder) {
         List<File> files = new ArrayList<>();
         for (File texFile : folder.listFiles()) {
             if (texFile.getName().endsWith(".tex") && !texFile.getName().endsWith("-trim.tex")) {
@@ -367,7 +369,7 @@ public class TexProcess {
      * @param folder
      * @return
      */
-    private static List<File> getTrimmedTexFileInFolder(File folder) {
+    static List<File> getTrimmedTexFileInFolder(File folder) {
         List<File> files = new ArrayList<>();
         for (File trimmedFile : folder.listFiles()) {
             if (trimmedFile.getName().endsWith("-trim.tex")) {
@@ -394,18 +396,18 @@ public class TexProcess {
      * @param texFile
      * @return
      */
-    private static File processTexFile(File texFile) {
+    static File processTexFile(File texFile) {
         BufferedReader reader = null;
         BufferedWriter writer = null;
         String path = texFile.getPath();
-        File trimedFile = new File(path.substring(0, path.length() - 4).replace(' ', '_') + "-trim.tex");
+        File trimmedFile = new File(path.substring(0, path.length() - 4).replace(' ', '_') + "-trim.tex");
         File originalFolder = new File(texFile.getParent() + File.separator + ORIGINAL_FOLDER_NAME);
         if (!originalFolder.exists()) originalFolder.mkdir();
         File originalFile = new File(originalFolder.getPath() + File.separator + texFile.getName());
         boolean processComplete = false;
         try {
             reader = new BufferedReader(new InputStreamReader(new FileInputStream(texFile), "UTF-8"));
-            writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(trimedFile), "UTF-8"));
+            writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(trimmedFile), "UTF-8"));
             String line;
             try {
                 boolean flag = false;
@@ -448,6 +450,6 @@ public class TexProcess {
             if (originalFile.exists()) originalFile.delete();
             texFile.renameTo(originalFile);
         }
-        return trimedFile;
+        return trimmedFile;
     }
 }
