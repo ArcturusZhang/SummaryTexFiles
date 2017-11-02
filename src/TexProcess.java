@@ -69,6 +69,9 @@ public class TexProcess {
     private static String decorateSection(String string) {
         String separator;
         switch (string.length()) {
+            case 2:
+                separator = "\\hskip 2em ";
+                break;
             case 3:
                 separator = "\\hskip 1em ";
                 break;
