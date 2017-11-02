@@ -6,11 +6,12 @@ import java.util.TreeMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+@Deprecated
 public class TexProcessOld {
     private final static String ORIGINAL_FOLDER_NAME = "originalTexes";
+    static PrintStream log;
     private static int warningCount = 0;
     private static String headerPath = "." + File.separator + "parts" + File.separator + "header.tex";
-    static PrintStream log;
 
     public static void process(String[] args) {
         log = System.out;
