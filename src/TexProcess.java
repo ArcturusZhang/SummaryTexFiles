@@ -1,22 +1,19 @@
-import sun.rmi.runtime.Log;
-
 import javax.swing.*;
 import java.io.*;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.TreeMap;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class TexProcess {
     private File mainFile;
     private File figureFolder;
+    private File partFolder;
     private Logger log;
     private File headerFile;
-    private String originalFolderName;
     private int warningCount = 0;
     private int logLevel;
+    private ArrayList<File> inputRawTexFiles;
+    private ArrayList<File> partFolders;
 
     TexProcess(File mainFile, File figureFolder, File headerFile, JTextArea logField, int logLevel) {
         this.mainFile = mainFile;
@@ -24,7 +21,24 @@ public class TexProcess {
         log = Logger.getLog(logField);
         this.logLevel = logLevel;
         this.headerFile = headerFile;
-        originalFolderName = "originalTexes";
+    }
+
+    TexProcess(File mainFile, File figureFolder, File headerFile, ArrayList<File> inputRawTexFiles, JTextArea logField, int logLevel) {
+        this.mainFile = mainFile;
+        this.figureFolder = figureFolder;
+        this.inputRawTexFiles = inputRawTexFiles;
+        log = Logger.getLog(logField);
+        this.logLevel = logLevel;
+        this.headerFile = headerFile;
+        partFolder = new File(mainFile.getAbsolutePath().replace(mainFile.getName(), "parts"));
+        partFolders = new ArrayList<>();
+        partFolders.add(new File(partFolder.getAbsolutePath() + File.separator + "Differential-01"));
+        partFolders.add(new File(partFolder.getAbsolutePath() + File.separator + "Integral-02"));
+        partFolders.add(new File(partFolder.getAbsolutePath() + File.separator + "Series-03"));
+        partFolders.add(new File(partFolder.getAbsolutePath() + File.separator + "UnCategorized"));
+        for (File folder : partFolders) {
+            if (!folder.exists()) folder.mkdir();
+        }
     }
 
     TexProcess(File mainFile, File figureFolder, JTextArea logField) {
@@ -32,55 +46,26 @@ public class TexProcess {
                 logField, Logger.MEDIUM);
     }
 
-    TexProcess(File mainFile, JTextArea logField) {
-        this(mainFile, new File("fig"), logField);
-    }
-
-    TexProcess(File mainFile) {
-        this(mainFile, null);
-    }
-
-    TexProcess(String mainFilePath, JTextArea logField) {
-        this(new File(mainFilePath), logField);
-    }
-
-    TexProcess(String mainFilePath) {
-        this(mainFilePath, null);
-    }
-
-    public void processTexFiles() {
+    public void process() {
         log.println("============================================Merge start============================================");
-        File currentFolder = new File(mainFile.getAbsolutePath().replace(mainFile.getName(), "parts"));
-        for (File file : currentFolder.listFiles()) {
-            if (file.isDirectory()) {
-                Pattern pattern = Pattern.compile("^\\S*(\\d{2})\\S*$");
-                Matcher matcher = pattern.matcher(file.getName());
-                if (matcher.find()) {
-                    for (File texFile : getTexFilesInFolder(file)) {
-                        processTexFile(texFile);
-                    }
-                }
+        // categorize input files by their prefix
+        HashMap<File, List<File>> rawTexMap = categorizeRawTexFiles(inputRawTexFiles);
+        for (File folder : rawTexMap.keySet()) {
+            for (File texFile : rawTexMap.get(folder)) {
+                processTexFile(folder, texFile);
             }
         }
-        // sort the trimmed tex file
-        TreeMap<String, List<File>> map = new TreeMap<>();
-        for (File file : currentFolder.listFiles()) {
-            if (file.isDirectory()) {
-                Pattern pattern = Pattern.compile("^\\S*(\\d{2})\\S*$");
-                Matcher matcher = pattern.matcher(file.getName());
-                if (matcher.find()) {
-                    String key = matcher.group(1);
-                    map.put(key, getTrimmedTexFileInFolder(file));
-                }
-            }
-        }
-        // decorating the trimmed file
-        for (String key : map.keySet()) {
-            for (File trimmedFile : map.get(key)) {
+        // decorate trimmed files
+        HashMap<File, List<File>> trimmedTexMap = new HashMap<>();
+        for (File folder : partFolders) {
+            trimmedTexMap.put(folder, getTrimmedTexFileInFolder(folder));
+            for (File trimmedFile : trimmedTexMap.get(folder)) {
                 decorateTrimmedFile(trimmedFile);
             }
         }
-        generateMainFile(mainFile, map);
+        // generate main file
+        generateMainFile(trimmedTexMap);
+        // output completion info in log
         log.print("All done");
         if (warningCount != 0) {
             log.print(" with " + warningCount + " warning(s)");
@@ -88,6 +73,31 @@ public class TexProcess {
             log.print(" without warnings");
         }
         log.println(". ");
+    }
+
+    private HashMap<File, List<File>> categorizeRawTexFiles(ArrayList<File> inputRawTexFiles) {
+        HashMap<File, List<File>> map = new HashMap<>();
+        for (File folder : partFolders) {
+            map.put(folder, new ArrayList<>());
+        }
+        for (File texFile : inputRawTexFiles) {
+            List<File> currentList;
+            switch (texFile.getName().substring(0, 6)) {
+                case "Differ":
+                    currentList = map.get(partFolders.get(0));
+                    break;
+                case "Integr":
+                    currentList = map.get(partFolders.get(1));
+                    break;
+                case "Series":
+                    currentList = map.get(partFolders.get(2));
+                    break;
+                default:
+                    currentList = map.get(partFolders.get(3));
+            }
+            currentList.add(texFile);
+        }
+        return map;
     }
 
     /**
@@ -171,23 +181,6 @@ public class TexProcess {
     }
 
     /**
-     * Returns a list of raw tex files in the given folder.
-     * A raw tex files is a file with the extension name of "tex", and whose filename does not ended with "-trim".
-     *
-     * @param folder
-     * @return
-     */
-    private List<File> getTexFilesInFolder(File folder) {
-        List<File> files = new ArrayList<>();
-        for (File texFile : folder.listFiles()) {
-            if (texFile.getName().endsWith(".tex") && !texFile.getName().endsWith("-trim.tex")) {
-                files.add(texFile);
-            }
-        }
-        return files;
-    }
-
-    /**
      * Returns a sorted list of trimmed tex files in the given folder.
      * A trimmed tex file is a file whose full name ended with "-trim.tex".
      * The list is sorted by the ordinal number which is contained in the filename.
@@ -197,13 +190,14 @@ public class TexProcess {
      */
     private List<File> getTrimmedTexFileInFolder(File folder) {
         List<File> files = new ArrayList<>();
+        Pattern pattern = Pattern.compile("^\\S*-(\\d{2})-\\S*");
         for (File trimmedFile : folder.listFiles()) {
-            if (trimmedFile.getName().endsWith("-trim.tex")) {
+            Matcher matcher = pattern.matcher(trimmedFile.getName());
+            if (trimmedFile.getName().endsWith("-trim.tex") && matcher.find()) {
                 files.add(trimmedFile);
             }
         }
         files.sort((File file1, File file2) -> {
-            Pattern pattern = Pattern.compile("^\\S*-(\\d{2})-\\S*");
             Matcher matcher1 = pattern.matcher(file1.getName());
             Matcher matcher2 = pattern.matcher(file2.getName());
             if (matcher1.find() && matcher2.find()) {
@@ -215,22 +209,12 @@ public class TexProcess {
         return files;
     }
 
-    /**
-     * Copy the content within "\begin{document}" and "\end{document}" in a raw tex file to the trimmed tex file.
-     * The title in raw tex files is renamed to chapter in trimmed tex files.
-     *
-     * @param texFile
-     * @return
-     */
-    private File processTexFile(File texFile) {
+    private File processTexFile(File folder, File texFile) {
         BufferedReader reader = null;
         BufferedWriter writer = null;
-        String path = texFile.getPath();
-        File trimmedFile = new File(path.substring(0, path.length() - 4).replace(' ', '_') + "-trim.tex");
-        File originalFolder = new File(texFile.getParent() + File.separator + originalFolderName);
-        if (!originalFolder.exists()) originalFolder.mkdir();
-        File originalFile = new File(originalFolder.getPath() + File.separator + texFile.getName());
-        boolean processComplete = false;
+        String texFileName = texFile.getName();
+        String trimmedFileName = texFileName.substring(0, texFileName.length() - 4).replace(' ', '_') + "-trim.tex";
+        File trimmedFile = new File(folder.getPath() + File.separator + trimmedFileName);
         try {
             reader = new BufferedReader(new InputStreamReader(new FileInputStream(texFile), "UTF-8"));
             writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(trimmedFile), "UTF-8"));
@@ -253,7 +237,6 @@ public class TexProcess {
             } catch (IOException e) {
                 e.printStackTrace();
             }
-            processComplete = true;
         } catch (IOException e) {
             e.printStackTrace();
         } finally {
@@ -272,13 +255,8 @@ public class TexProcess {
                 }
             }
         }
-        if (processComplete) {
-            if (originalFile.exists()) originalFile.delete();
-            texFile.renameTo(originalFile);
-        }
         return trimmedFile;
     }
-
 
     /**
      * Tweak the trimmed tex file content.
@@ -332,7 +310,7 @@ public class TexProcess {
                         } else {
                             if (logLevel >= Logger.MEDIUM)
                                 log.println("INFO--title error (ignore this if title exists) at line " + lineNumber
-                                    + " of file " + trimmedFile.getPath());
+                                        + " of file " + trimmedFile.getPath());
                         }
                         chapterInfo.append(line).append("\n").append("\\input{")
                                 .append(headerFile.getPath().replace("\\", "/")).append("}\n");
@@ -429,17 +407,15 @@ public class TexProcess {
     /**
      * Generate the main tex file using the map of part name and the corresponding list of tex files.
      * Inject the file names into the main file at certain position.
-     *
-     * @param mainFile
-     * @param map
+     * @param trimmedTexMap
      */
-    private void generateMainFile(File mainFile, TreeMap<String, List<File>> map) {
+    private void generateMainFile(HashMap<File, List<File>> trimmedTexMap) {
         StringBuilder injectContent = new StringBuilder();
-        Iterator<String> iterator = map.keySet().iterator();
-        while (iterator.hasNext()) {
-            for (File texFile : map.get(iterator.next())) {
-                injectContent.append("\\input{").append(texFile.getPath().replace('\\', '/')).append("}\n");
-                if (logLevel >= Logger.HIGH) log.println("File: " + texFile.getPath() + " injected into main file.");
+        for (File folder : partFolders) {
+            for (File trimmedTexFile : trimmedTexMap.get(folder)) {
+                injectContent.append("\\input{").append(trimmedTexFile.getPath().replace('\\', '/'))
+                        .append("}\n");
+                if (logLevel >= Logger.HIGH) log.println("File: " + trimmedTexFile.getPath() + " injected into main file.");
             }
         }
         BufferedReader reader = null;
@@ -465,21 +441,21 @@ public class TexProcess {
             }
             writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(mainFile), "UTF-8"));
             writer.write(content.toString());
-        } catch (IOException e) {
-            e.printStackTrace();
+        } catch (IOException e1) {
+            e1.printStackTrace();
         } finally {
             if (reader != null) {
                 try {
                     reader.close();
-                } catch (IOException e) {
-                    e.printStackTrace();
+                } catch (IOException e1) {
+                    e1.printStackTrace();
                 }
             }
             if (writer != null) {
                 try {
                     writer.close();
-                } catch (IOException e) {
-                    e.printStackTrace();
+                } catch (IOException e1) {
+                    e1.printStackTrace();
                 }
             }
         }

@@ -9,6 +9,7 @@ import java.awt.event.WindowEvent;
 import java.io.File;
 
 public class SimpleTexProcessProgram {
+    private static String previousFileChooserPath = ".";
     static SimpleTexProcessProgram mainWindow;
     private JLabel mainFileLabel;
     private JLabel figLabel;
@@ -25,12 +26,18 @@ public class SimpleTexProcessProgram {
     private JList<String> texFilesList;
     private DefaultListModel<String> listModel;
     private JCheckBox ignoreWrongFilenameCheckBox;
-
     private JCheckBox autoSortCheckButton;
     private JButton insertButton;
     private JButton deleteButton;
+    private JButton clearButton;
     private JButton moveUpButton;
     private JButton moveDownButton;
+    private JToggleButton showLogButton;
+    private JButton clearLogButton;
+
+    public JCheckBox getIgnoreWrongFilenameCheckBox() {
+        return ignoreWrongFilenameCheckBox;
+    }
 
     private SimpleTexProcessProgram() {
         mainFrame = new JFrame("Simple Tex Process Program");
@@ -72,7 +79,7 @@ public class SimpleTexProcessProgram {
                 90, Constants.COMPONENT_HEIGHT);
         ignoreWrongFilenameCheckBox = new JCheckBox("忽略错误");
         ignoreWrongFilenameCheckBox.setBounds(autoSortCheckButton.getX(),
-                autoSortCheckButton.getY() + autoSortCheckButton.getHeight() + Constants.MARGIN_GAP,
+                autoSortCheckButton.getY() + autoSortCheckButton.getHeight(),
                 autoSortCheckButton.getWidth(), Constants.COMPONENT_HEIGHT);
         ignoreWrongFilenameCheckBox.setToolTipText("忽略不符合规范的文件名");
         insertButton = new JButton("添加文件");
@@ -82,11 +89,20 @@ public class SimpleTexProcessProgram {
         deleteButton = new JButton("移除文件");
         deleteButton.setBounds(insertButton.getX(), insertButton.getY() + insertButton.getHeight() + Constants.MARGIN_GAP,
                 insertButton.getWidth(), Constants.COMPONENT_HEIGHT);
+        clearButton = new JButton("移除所有");
+        clearButton.setBounds(insertButton.getX(), deleteButton.getY() + deleteButton.getHeight() + Constants.MARGIN_GAP,
+                insertButton.getWidth(), Constants.COMPONENT_HEIGHT);
         moveUpButton = new JButton("上移");
-        moveUpButton.setBounds(insertButton.getX(), deleteButton.getY() + deleteButton.getHeight() + Constants.MARGIN_GAP,
+        moveUpButton.setBounds(insertButton.getX(), clearButton.getY() + clearButton.getHeight() + Constants.MARGIN_GAP,
                 insertButton.getWidth(), Constants.COMPONENT_HEIGHT);
         moveDownButton = new JButton("下移");
         moveDownButton.setBounds(insertButton.getX(), moveUpButton.getY() + moveUpButton.getHeight() + Constants.MARGIN_GAP,
+                insertButton.getWidth(), Constants.COMPONENT_HEIGHT);
+        showLogButton = new JToggleButton("显示日志");
+        showLogButton.setBounds(insertButton.getX(), moveDownButton.getY() + moveDownButton.getHeight() + Constants.MARGIN_GAP,
+                insertButton.getWidth(), Constants.COMPONENT_HEIGHT);
+        clearLogButton = new JButton("清空日志");
+        clearLogButton.setBounds(insertButton.getX(), showLogButton.getY() + showLogButton.getHeight() + Constants.MARGIN_GAP,
                 insertButton.getWidth(), Constants.COMPONENT_HEIGHT);
         initMainFrame();
         initLogFrame();
@@ -124,10 +140,12 @@ public class SimpleTexProcessProgram {
     private void setToDefault() {
         asySortCheckBox.setSelected(true);
         autoSortCheckButton.setSelected(true);
-        ignoreWrongFilenameCheckBox.setSelected(true);
+        ignoreWrongFilenameCheckBox.setSelected(false);
         deleteButton.setEnabled(false);
+        clearButton.setEnabled(false);
         moveUpButton.setEnabled(false);
         moveDownButton.setEnabled(false);
+        showLogButton.setSelected(true);
         mainFrame.setVisible(true);
         mainFrame.addWindowListener(new WindowAdapter() {
             @Override
@@ -151,8 +169,11 @@ public class SimpleTexProcessProgram {
         mainFrame.add(ignoreWrongFilenameCheckBox);
         mainFrame.add(insertButton);
         mainFrame.add(deleteButton);
+        mainFrame.add(clearButton);
         mainFrame.add(moveUpButton);
         mainFrame.add(moveDownButton);
+        mainFrame.add(showLogButton);
+        mainFrame.add(clearLogButton);
     }
 
     private void addActionListeners() {
@@ -171,9 +192,21 @@ public class SimpleTexProcessProgram {
             }
         });
         deleteButton.addActionListener(new ListButtonActionListener());
+        clearButton.addActionListener(new ListButtonActionListener());
         texFilesList.addListSelectionListener(e -> {
             if (e.getSource() == texFilesList) {
                 deleteButton.setEnabled(true);
+                clearButton.setEnabled(true);
+            }
+        });
+        showLogButton.addChangeListener(e -> {
+            if (e.getSource() == showLogButton) {
+                logFrame.setVisible(showLogButton.isSelected());
+            }
+        });
+        clearLogButton.addActionListener(e -> {
+            if (e.getSource() == clearLogButton) {
+                logField.setText("");
             }
         });
     }
@@ -196,7 +229,9 @@ public class SimpleTexProcessProgram {
         texFilesList.setEnabled(enabled);
         insertButton.setEnabled(enabled);
         autoSortCheckButton.setEnabled(enabled);
-        ignoreWrongFilenameCheckBox.setSelected(enabled);
+        ignoreWrongFilenameCheckBox.setEnabled(enabled);
+        showLogButton.setEnabled(enabled);
+        clearLogButton.setEnabled(enabled);
     }
 
     public JFrame getMainFrame() {
@@ -248,29 +283,33 @@ public class SimpleTexProcessProgram {
         public void actionPerformed(ActionEvent e) {
             JFileChooser fileChooser;
             if (e.getSource() == mainFileBrowseButton) {
-                fileChooser = new JFileChooser(new File("."));
+                fileChooser = new JFileChooser(new File(previousFileChooserPath));
                 fileChooser.setDialogTitle("选择主文件");
                 fileChooser.setFileFilter(new FileNameExtensionFilter("*.tex", "tex"));
                 int val = fileChooser.showOpenDialog(mainFrame);
                 if (val == JFileChooser.APPROVE_OPTION) {
                     mainFileTextField.setText(fileChooser.getSelectedFile().getPath());
+                    previousFileChooserPath = fileChooser.getCurrentDirectory().getPath();
                 }
             } else if (e.getSource() == figBrowseButton) {
-                fileChooser = new JFileChooser(new File("."));
+                fileChooser = new JFileChooser(new File(previousFileChooserPath));
                 fileChooser.setDialogTitle("选择图片文件夹");
                 fileChooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
                 int val = fileChooser.showOpenDialog(mainFrame);
                 if (val == JFileChooser.APPROVE_OPTION) {
                     figTextField.setText(fileChooser.getSelectedFile().getPath());
+                    previousFileChooserPath = fileChooser.getCurrentDirectory().getPath();
                 }
             } else if (e.getSource() == insertButton) {
-                fileChooser = new JFileChooser(new File("."));
+                fileChooser = new JFileChooser(new File(previousFileChooserPath));
                 fileChooser.setDialogTitle("选择要插入的tex文件");
                 fileChooser.setMultiSelectionEnabled(true);
                 fileChooser.setFileFilter(new FileNameExtensionFilter(".tex", "tex"));
                 int val = fileChooser.showOpenDialog(mainFrame);
                 if (val == JFileChooser.APPROVE_OPTION) {
                     for (File file : fileChooser.getSelectedFiles()) listModel.addElement(file.getPath());
+                    previousFileChooserPath = fileChooser.getCurrentDirectory().getPath();
+                    clearButton.setEnabled(true);
                 }
             }
         }
@@ -285,6 +324,10 @@ public class SimpleTexProcessProgram {
                     listModel.remove(indices[i]);
                 }
                 if (texFilesList.isSelectionEmpty() || listModel.getSize() == 0) deleteButton.setEnabled(false);
+            }
+            if (e.getSource() == clearButton) {
+                listModel.removeAllElements();
+                clearButton.setEnabled(false);
             }
         }
     }
