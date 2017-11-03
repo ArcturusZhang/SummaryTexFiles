@@ -1,3 +1,4 @@
+import javax.swing.*;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
@@ -8,44 +9,72 @@ import java.util.HashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-public class AsySorting {
-    public static void main(String[] args) {
-        String filePath;
-        if (args.length == 0) {
-            filePath = ".";
-        } else {
-            filePath = args[0];
-        }
-        File current = new File(filePath);
-        if (!current.isDirectory()) {
-            System.out.println("Invalid input.");
-            System.exit(0);
-        }
-        ArrayList<File> asyFileList = new ArrayList<>();
-        ArrayList<File> folderList = new ArrayList<>();
-        for (File file : current.listFiles()) {
-            if (file.getName().endsWith(".asy")) asyFileList.add(file);
-            if (file.isDirectory() && file.getName().matches("^size([\\d]+)$")) {
-                folderList.add(file);
-            }
-        }
-        correctionFiles(folderList);
-        sortAsyFiles(sortFiles(asyFileList));
+public class AsyFileArrange {
+    private File figureFolder;
+    private JTextArea logField;
+    private Logger log;
+
+    /**
+     * Create an instance of asy file arrange agent.
+     * @param figureFolder the folder of asy files
+     * @param logField a JTextArea to write log, this could be null, in which case no log will be output.
+     */
+    AsyFileArrange(File figureFolder, JTextArea logField) {
+        this.figureFolder = figureFolder;
+        this.logField = logField;
+        this.log = Logger.getLog(logField);
     }
 
-    private static void correctionFiles(ArrayList<File> folderList) {
+    /**
+     * Create an instance of asy file arrange agent without log output.
+     * @param figureFolder the folder of asy files
+     */
+    AsyFileArrange(File figureFolder) {
+        this(figureFolder, null);
+    }
+
+    AsyFileArrange(String figurePath, JTextArea logField) {
+        this(new File(figurePath), logField);
+    }
+
+    AsyFileArrange(String figurePath) {
+        this(figurePath, null);
+    }
+
+    /**
+     * Start the arrangement of asy files and the corresponding pdf files.
+     */
+    public void arrangeAsyFiles() {
+        log.println("============================================Arrange start============================================");
+        ArrayList<File> asyFileList = new ArrayList<>();
+        ArrayList<File> folderList = new ArrayList<>();
+        try {
+            for (File file : figureFolder.listFiles()) {
+                if (file.getName().endsWith(".asy")) asyFileList.add(file);
+                if (file.isDirectory() && file.getName().matches("^size([\\d]+)$")) {
+                    folderList.add(file);
+                }
+            }
+            correctionFiles(folderList);
+            sortAsyFiles(categorizeAsyFiles(asyFileList));
+        } catch (NullPointerException e) {
+            log.println("Figure folder: " + figureFolder.getName() + "does not exist or is empty.");
+        }
+    }
+
+    private void correctionFiles(ArrayList<File> folderList) {
         for (File folder : folderList) {
-            HashMap<String, ArrayList<File>> map = sortFiles(new ArrayList<>(Arrays.asList(folder.listFiles())));
+            HashMap<String, ArrayList<File>> map = categorizeAsyFiles(new ArrayList<>(Arrays.asList(folder.listFiles())));
             if (map.size() >= 1) {
                 sortAsyFiles(map);
             }
         }
     }
 
-    private static void sortAsyFiles(HashMap<String, ArrayList<File>> map) {
+    private void sortAsyFiles(HashMap<String, ArrayList<File>> map) {
         boolean flag;
         for (String size : map.keySet()) {
-            File folder = new File("." + File.separator + "size" + size);
+            File folder = new File(figureFolder.getPath() + File.separator + "size" + size);
             // if the folder does not exist, create it.
             if (!folder.exists()) {
                 folder.mkdir();
@@ -56,9 +85,9 @@ public class AsySorting {
                 String newPath = folder + File.separator;
                 flag = file.renameTo(new File(newPath + file.getName()));
                 if (flag) {
-                    System.out.println("Moved file: " + file.getName() + " to: " + newPath);
+                    log.println("Moved file: " + file.getName() + " to: " + newPath);
                 } else {
-                    System.out.println("Move file: " + file.getName() + " failed.");
+                    log.println("Move file: " + file.getName() + " failed.");
                 }
                 // move the pdf file (if exists) to the corresponding folder
                 String filename = file.getPath();
@@ -66,14 +95,19 @@ public class AsySorting {
                 if (pdfFile.exists()) {
                     flag = pdfFile.renameTo(new File(newPath + pdfFile.getName()));
                     if (flag) {
-                        System.out.println("Moved file: " + pdfFile.getName() + " to: " + newPath);
+                        log.println("Moved file: " + pdfFile.getName() + " to: " + newPath);
                     }
                 }
             }
         }
     }
 
-    private static HashMap<String, ArrayList<File>> sortFiles(ArrayList<File> asyFileList) {
+    /**
+     * Create a map from size to a list of files of that size.
+     * @param asyFileList all the files need to categorize.
+     * @return a categorized map
+     */
+    private HashMap<String, ArrayList<File>> categorizeAsyFiles(ArrayList<File> asyFileList) {
         HashMap<String, ArrayList<File>> map = new HashMap<>();
         BufferedReader reader = null;
         String lineContent;
@@ -107,6 +141,7 @@ public class AsySorting {
                     }
                 }
             }
+            log.println("Asy file: " + file.getPath() + "does not contains size information. This file has been ignored.");
         }
         return map;
     }
