@@ -1,48 +1,200 @@
-import java.io.File;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.Enumeration;
-import java.util.Iterator;
+import javax.swing.*;
+import java.io.*;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class ProcessFiles implements Runnable {
-    private final static String ORIGINAL_FOLDER_NAME = "originalTexes";
-    private static int warningCount = 0;
-    private String headerPath = "." + File.separator + "parts" + File.separator + "header.tex";
-    private String mainFilePath;
-    private String figFolderPath;
+    private final String headerFileName = "header.tex";
+    private final String indexContentFilename = "indexcontent.tex";
+    private File mainFile;
+    private File figureFolder;
+    private File partFolder;
+    private File headerFile;
+    private File indexContentFile;
+    private List<File> partFolders;
     private SimpleTexProcessProgram mainWindow;
     private Logger log;
+    private Process process;
 
     ProcessFiles(String mainFilePath, String figFolderPath) {
-        this.mainFilePath = mainFilePath;
-        this.figFolderPath = figFolderPath;
+        this.mainFile = new File(mainFilePath);
+        this.figureFolder = new File(figFolderPath);
         this.mainWindow = SimpleTexProcessProgram.mainWindow;
-        this.log = Logger.getLog(mainWindow.getLogField());
+        this.log = Logger.getLog();
+        log.setLogField(mainWindow.getLogField());
+        initialize();
+    }
+
+    /**
+     * This method initialize some of the constant settings, such as folder name.
+     * These info should be changed into program settings, other than writing here directly in the code.
+     */
+    private void initialize() {
+        partFolder = new File(mainFile.getPath().replace(mainFile.getName(), "parts"));
+        headerFile = new File(partFolder.getPath() + File.separator + headerFileName);
+        partFolders = new ArrayList<>();
+        partFolders.add(new File(partFolder.getPath() + File.separator + "Differential-01"));
+        partFolders.add(new File(partFolder.getPath() + File.separator + "Integral-02"));
+        partFolders.add(new File(partFolder.getPath() + File.separator + "Series-03"));
+        partFolders.add(new File(partFolder.getPath() + File.separator + "UnCategorized"));
+        indexContentFile = new File(partFolder.getPath() + File.separator + indexContentFilename);
+    }
+
+    /**
+     * Ensure the existence of important files. If one of them do not exist, terminate the whole process.
+     * @return {@code true} if all exist, otherwise {@ocde false}
+     */
+    private boolean ensureExistence() {
+        if (!headerFile.exists()) {
+            log.println("Header file: " + headerFile.getPath() + "does not exist.");
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Stop the process of compilation of the main tex file.
+     */
+    public void destroyTexCompileProcess() {
+        if (process != null && process.isAlive()) {
+            process.destroy();
+        }
     }
 
     @Override
     public void run() {
-        ArrayList<File> inputRawTexFiles = getInputFiles();
-        mainWindow.lockComponents();
-        File mainFile = new File(mainFilePath);
-        File figureFolder = new File(figFolderPath);
-        File headerFile = new File(headerPath);
-        if (mainWindow.getAsySortCheckBox().isSelected()) {
-            AsyFileArrange asyFileArrange = new AsyFileArrange(figureFolder, mainWindow.getLogField());
-            asyFileArrange.arrangeAsyFiles();
+        if (ensureExistence()) {
+            mainWindow.lockComponents();
+            Logger.setLogLevel(Logger.LOW);
+            if (mainWindow.getAsySortCheckBox().isSelected()) {
+                AsyFileArrange asyFileArrange = new AsyFileArrange(figureFolder);
+                asyFileArrange.arrangeAsyFiles();
+            }
+            ArrayList<File> inputRawTexFiles = getInputFiles();
+            TexProcess texProcess = new TexProcess(inputRawTexFiles, mainFile, figureFolder, partFolder, headerFile, partFolders);
+            texProcess.process();
+            int result = JOptionPane.showConfirmDialog(mainWindow.getMainFrame(),
+                    "合并已完成，是否编译文件" + mainFile.getName() + "?", "合并完成", JOptionPane.YES_NO_OPTION);
+            if (result == JOptionPane.YES_OPTION) {
+                compileMainFile();
+                makeIndex();
+                generateIndexContent();
+                compileMainFile();
+                JOptionPane.showMessageDialog(mainWindow.getMainFrame(), "已全部完成。", "已完成",
+                        JOptionPane.INFORMATION_MESSAGE);
+            }
+            mainWindow.unlockComponents();
         }
-        TexProcess texProcess = new TexProcess(mainFile, figureFolder, headerFile, inputRawTexFiles, mainWindow.getLogField(), Logger.LOW);
-//        texProcess.processTexFiles();
-        texProcess.process();
-        mainWindow.unlockComponents();
-//        JOptionPane.showMessageDialog(mainWindow.getMainFrame(), "合并完成。", "合并完成", JOptionPane.INFORMATION_MESSAGE);
+    }
+
+    /**
+     * Compile the main tex file. Execute the command by {@code Runtime.getRuntime().exec(String)}, and use
+     * {@code Process.getInputStream} to get the information the executed command print to the command line.
+     */
+    private void compileMainFile() {
+        log.println("============================================Compile start============================================");
+        BufferedReader reader = null;
+        try {
+            process = Runtime.getRuntime().exec("xelatex " + mainFile.getPath());
+            reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+            String line;
+            while ((line = reader.readLine()) != null) {
+                log.println(line);
+            }
+            process.waitFor();
+        } catch (IOException e) {
+            log.printStackTrace(e);
+        } catch (InterruptedException e) {
+            log.println("Compile has been terminated.");
+        } finally {
+            if (reader != null) {
+                try {
+                    reader.close();
+                } catch (IOException e) {
+                    log.printStackTrace(e);
+                }
+            }
+        }
+    }
+
+    /**
+     * Execute {@code makeindex} program to generate the index information of the main tex file.
+     */
+    private void makeIndex() {
+        log.println("============================================Makeindex start============================================");
+        BufferedReader reader = null;
+        try {
+            process = Runtime.getRuntime()
+                    .exec("makeindex " + mainFile.getPath().replace(".tex", ".idx"));
+            reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+            String line;
+            while ((line = reader.readLine()) != null) {
+                log.println(line);
+            }
+            process.waitFor();
+        } catch (IOException e) {
+            log.printStackTrace(e);
+        } catch (InterruptedException e) {
+            log.println("Makeindex has been terminated.");
+        } finally {
+            if (reader != null) {
+                try {
+                    reader.close();
+                } catch (IOException e) {
+                    log.printStackTrace(e);
+                }
+            }
+        }
+    }
+
+    /**
+     * Generate index file content using the output of {@code makeindex} program.
+     */
+    private void generateIndexContent() {
+        log.println("============================================Generating index file============================================");
+        BufferedReader reader = null;
+        BufferedWriter writer = null;
+        try {
+            reader = new BufferedReader(new InputStreamReader(
+                    new FileInputStream(mainFile.getPath().replace(".tex", ".ind")), "UTF-8"
+            ));
+            StringBuilder indexContent = new StringBuilder();
+            String line;
+            boolean indexBeginFlag = false;
+            while ((line = reader.readLine()) != null) {
+                if (line.trim().startsWith("\\end{theindex}")) indexBeginFlag = false;
+                if (indexBeginFlag) {
+                    indexContent.append(line).append("\n");
+                }
+                if (line.trim().startsWith("\\begin{theindex}")) indexBeginFlag = true;
+            }
+            writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(indexContentFile),"UTF-8"));
+            writer.write(indexContent.toString());
+        } catch (FileNotFoundException e) {
+            log.println("Index file " + mainFile.getPath().replace(".tex", ".ind") + "not found.");
+        } catch (IOException e) {
+            log.printStackTrace(e);
+        } finally {
+            if (reader != null) {
+                try {
+                    reader.close();
+                } catch (IOException e) {
+                    log.printStackTrace(e);
+                }
+            }
+            if (writer != null) {
+                try {
+                    writer.close();
+                } catch (IOException e) {
+                    log.printStackTrace(e);
+                }
+            }
+        }
     }
 
     /**
      * Extract a list of files selected.
-     *
      * @return a list of tex files.
      */
     private ArrayList<File> getInputFiles() {
@@ -52,7 +204,7 @@ public class ProcessFiles implements Runnable {
         while (enumeration.hasMoreElements()) {
             File file = new File(enumeration.nextElement());
             if (!file.exists()) {
-                log.println("WARNING--tex file not found: " + file.getName());
+                log.println("WARNING--tex file not found: " + file.getName(), Logger.LOW);
             } else {
                 if (!mainWindow.getIgnoreWrongFilenameCheckBox().isSelected()) {
                     Matcher matcher = pattern.matcher(file.getName());
@@ -73,8 +225,7 @@ public class ProcessFiles implements Runnable {
                     Matcher matcher1 = pattern.matcher(file1.getName());
                     Matcher matcher2 = pattern.matcher(file2.getName());
                     if (matcher1.find() && matcher2.find()) {
-                        int result = matcher1.group(2).compareTo(matcher2.group(2));
-                        return result;
+                        return matcher1.group(2).compareTo(matcher2.group(2));
                     }
                     return file1.getName().compareTo(file2.getName());
                 }
@@ -92,6 +243,7 @@ public class ProcessFiles implements Runnable {
                 }
             }
         }
+        mainWindow.getListModel().removeAllElements();
         return inputRawTexFiles;
     }
 }

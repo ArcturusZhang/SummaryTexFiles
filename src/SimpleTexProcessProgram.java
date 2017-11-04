@@ -8,9 +8,12 @@ import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.io.File;
 
+/**
+ * Main class of the simple program. The names of variables and method implies their purpose
+ */
 public class SimpleTexProcessProgram {
-    private static String previousFileChooserPath = ".";
     static SimpleTexProcessProgram mainWindow;
+    private static String previousFileChooserPath = ".";
     private JLabel mainFileLabel;
     private JLabel figLabel;
     private JFrame mainFrame;
@@ -34,10 +37,9 @@ public class SimpleTexProcessProgram {
     private JButton moveDownButton;
     private JToggleButton showLogButton;
     private JButton clearLogButton;
-
-    public JCheckBox getIgnoreWrongFilenameCheckBox() {
-        return ignoreWrongFilenameCheckBox;
-    }
+    private Thread processThread;
+    private ProcessFiles processFiles;
+    private JButton terminateButton;
 
     private SimpleTexProcessProgram() {
         mainFrame = new JFrame("Simple Tex Process Program");
@@ -104,6 +106,8 @@ public class SimpleTexProcessProgram {
         clearLogButton = new JButton("清空日志");
         clearLogButton.setBounds(insertButton.getX(), showLogButton.getY() + showLogButton.getHeight() + Constants.MARGIN_GAP,
                 insertButton.getWidth(), Constants.COMPONENT_HEIGHT);
+        terminateButton = new JButton("终止进程");
+        terminateButton.setBounds(confirmButton.getBounds());
         initMainFrame();
         initLogFrame();
         setToDefault();
@@ -146,6 +150,8 @@ public class SimpleTexProcessProgram {
         moveUpButton.setEnabled(false);
         moveDownButton.setEnabled(false);
         showLogButton.setSelected(true);
+        terminateButton.setEnabled(false);
+        terminateButton.setVisible(false);
         mainFrame.setVisible(true);
         mainFrame.addWindowListener(new WindowAdapter() {
             @Override
@@ -174,6 +180,7 @@ public class SimpleTexProcessProgram {
         mainFrame.add(moveDownButton);
         mainFrame.add(showLogButton);
         mainFrame.add(clearLogButton);
+        mainFrame.add(terminateButton);
     }
 
     private void addActionListeners() {
@@ -182,7 +189,17 @@ public class SimpleTexProcessProgram {
         insertButton.addActionListener(new BrowseButtonActionListener());
         confirmButton.addActionListener(e -> {
             if (e.getSource() == confirmButton) {
-                new Thread(new ProcessFiles(mainFileTextField.getText(), figTextField.getText())).start();
+                processFiles = new ProcessFiles(mainFileTextField.getText(), figTextField.getText());
+                processThread = new Thread(processFiles);
+                processThread.start();
+            }
+        });
+        terminateButton.addActionListener(e -> {
+            if (e.getSource() == terminateButton) {
+                if (processThread != null && processThread.isAlive()) {
+                    processFiles.destroyTexCompileProcess();
+                    processThread.interrupt();
+                }
             }
         });
         autoSortCheckButton.addChangeListener(e -> {
@@ -212,10 +229,14 @@ public class SimpleTexProcessProgram {
     }
 
     public void lockComponents() {
+        confirmButton.setVisible(false);
+        terminateButton.setVisible(true);
         setEnabled(false);
     }
 
     public void unlockComponents() {
+        confirmButton.setVisible(true);
+        terminateButton.setVisible(false);
         setEnabled(true);
     }
 
@@ -232,6 +253,7 @@ public class SimpleTexProcessProgram {
         ignoreWrongFilenameCheckBox.setEnabled(enabled);
         showLogButton.setEnabled(enabled);
         clearLogButton.setEnabled(enabled);
+        terminateButton.setEnabled(!enabled);
     }
 
     public JFrame getMainFrame() {
@@ -276,6 +298,10 @@ public class SimpleTexProcessProgram {
 
     public DefaultListModel<String> getListModel() {
         return listModel;
+    }
+
+    public JCheckBox getIgnoreWrongFilenameCheckBox() {
+        return ignoreWrongFilenameCheckBox;
     }
 
     class BrowseButtonActionListener implements ActionListener {

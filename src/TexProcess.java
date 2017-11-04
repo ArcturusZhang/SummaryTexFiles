@@ -1,6 +1,8 @@
-import javax.swing.*;
 import java.io.*;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -11,52 +13,37 @@ public class TexProcess {
     private Logger log;
     private File headerFile;
     private int warningCount = 0;
-    private int logLevel;
-    private ArrayList<File> inputRawTexFiles;
-    private ArrayList<File> partFolders;
+    private List<File> inputRawTexFiles;
+    private List<File> partFolders;
 
-    TexProcess(File mainFile, File figureFolder, File headerFile, JTextArea logField, int logLevel) {
-        this.mainFile = mainFile;
-        this.figureFolder = figureFolder;
-        log = Logger.getLog(logField);
-        this.logLevel = logLevel;
-        this.headerFile = headerFile;
-    }
-
-    TexProcess(File mainFile, File figureFolder, File headerFile, ArrayList<File> inputRawTexFiles, JTextArea logField, int logLevel) {
+    TexProcess(List<File> inputRawTexFiles, File mainFile, File figureFolder, File partFolder, File headerFile,
+               List<File> partFolders) {
         this.mainFile = mainFile;
         this.figureFolder = figureFolder;
         this.inputRawTexFiles = inputRawTexFiles;
-        log = Logger.getLog(logField);
-        this.logLevel = logLevel;
+        this.log = Logger.getLog();
         this.headerFile = headerFile;
-        partFolder = new File(mainFile.getAbsolutePath().replace(mainFile.getName(), "parts"));
-        partFolders = new ArrayList<>();
-        partFolders.add(new File(partFolder.getAbsolutePath() + File.separator + "Differential-01"));
-        partFolders.add(new File(partFolder.getAbsolutePath() + File.separator + "Integral-02"));
-        partFolders.add(new File(partFolder.getAbsolutePath() + File.separator + "Series-03"));
-        partFolders.add(new File(partFolder.getAbsolutePath() + File.separator + "UnCategorized"));
+        this.partFolder = partFolder;
+        this.partFolders = partFolders;
         for (File folder : partFolders) {
             if (!folder.exists()) folder.mkdir();
         }
     }
 
-    TexProcess(File mainFile, File figureFolder, JTextArea logField) {
-        this(mainFile, figureFolder, new File("." + File.separator + "parts" + File.separator + "header.tex"),
-                logField, Logger.MEDIUM);
-    }
-
+    /**
+     * Execute the process
+     */
     public void process() {
         log.println("============================================Merge start============================================");
         // categorize input files by their prefix
-        HashMap<File, List<File>> rawTexMap = categorizeRawTexFiles(inputRawTexFiles);
+        Map<File, List<File>> rawTexMap = categorizeRawTexFiles(inputRawTexFiles);
         for (File folder : rawTexMap.keySet()) {
             for (File texFile : rawTexMap.get(folder)) {
                 processTexFile(folder, texFile);
             }
         }
         // decorate trimmed files
-        HashMap<File, List<File>> trimmedTexMap = new HashMap<>();
+        Map<File, List<File>> trimmedTexMap = new HashMap<>();
         for (File folder : partFolders) {
             trimmedTexMap.put(folder, getTrimmedTexFileInFolder(folder));
             for (File trimmedFile : trimmedTexMap.get(folder)) {
@@ -75,8 +62,13 @@ public class TexProcess {
         log.println(". ");
     }
 
-    private HashMap<File, List<File>> categorizeRawTexFiles(ArrayList<File> inputRawTexFiles) {
-        HashMap<File, List<File>> map = new HashMap<>();
+    /**
+     * categorize the input tex files by their filename.
+     * @param inputRawTexFiles input tex files
+     * @return a map describe the result of categorization.
+     */
+    private Map<File, List<File>> categorizeRawTexFiles(List<File> inputRawTexFiles) {
+        Map<File, List<File>> map = new HashMap<>();
         for (File folder : partFolders) {
             map.put(folder, new ArrayList<>());
         }
@@ -209,7 +201,12 @@ public class TexProcess {
         return files;
     }
 
-    private File processTexFile(File folder, File texFile) {
+    /**
+     * Reader the content of a tex file, transfer the main part of it to the trimmed tex file.
+     * @param folder the corresponding folder of the trimmed file
+     * @param texFile the raw tex file.
+     */
+    private void processTexFile(File folder, File texFile) {
         BufferedReader reader = null;
         BufferedWriter writer = null;
         String texFileName = texFile.getName();
@@ -235,44 +232,42 @@ public class TexProcess {
                     if (line.trim().startsWith("\\maketitle")) flag = true;
                 }
             } catch (IOException e) {
-                e.printStackTrace();
+                log.printStackTrace(e);
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            log.printStackTrace(e);
         } finally {
             if (reader != null) {
                 try {
                     reader.close();
                 } catch (IOException e) {
-                    e.printStackTrace();
+                    log.printStackTrace(e);
                 }
             }
             if (writer != null) {
                 try {
                     writer.close();
                 } catch (IOException e) {
-                    e.printStackTrace();
+                    log.printStackTrace(e);
                 }
             }
         }
-        return trimmedFile;
     }
 
     /**
      * Tweak the trimmed tex file content.
      * First tweak the chapter title, remove the illegal characters.
      * Second tweak the section and subsection title (if needed), adding separator between every pair of adjacent characters.
-     * Third tweak the includegraphics line. Ensure the existence of the figure intended to include, calculate and correct
-     * the width of the figure. Print warnings if the figure file does not exist or the figure file duplicates.
-     *
-     * @param trimmedFile
+     * Third tweak the {@code includegraphics} line. Ensure the existence of the figure intended to include,
+     * calculate and correct the width of the figure. Print warnings if the figure file does not exist or the
+     * figure file duplicates.
+     * @param trimmedFile current file
      */
     private void decorateTrimmedFile(File trimmedFile) {
         BufferedReader reader = null;
         BufferedWriter writer = null;
         StringBuilder content = new StringBuilder();
         StringBuilder chapterInfo = new StringBuilder();
-        if (!headerFile.exists()) throw new RuntimeException("Need header file:" + headerFile.getPath());
         try {
             reader = new BufferedReader(new InputStreamReader(new FileInputStream(trimmedFile), "UTF-8"));
             String line;
@@ -308,9 +303,8 @@ public class TexProcess {
                             newChapterSB.append("{").append(newTitle).append("}");
                             line = newChapterSB.toString();
                         } else {
-                            if (logLevel >= Logger.MEDIUM)
-                                log.println("INFO--title error (ignore this if title exists) at line " + lineNumber
-                                        + " of file " + trimmedFile.getPath());
+                            log.println("INFO--title error (ignore this if title exists) at line " + lineNumber
+                                    + " of file " + trimmedFile.getPath(), Logger.MEDIUM);
                         }
                         chapterInfo.append(line).append("\n").append("\\input{")
                                 .append(headerFile.getPath().replace("\\", "/")).append("}\n");
@@ -379,26 +373,26 @@ public class TexProcess {
                     lineNumber++;
                 }
             } catch (IOException e) {
-                e.printStackTrace();
+                log.printStackTrace(e);
             }
             writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(trimmedFile), "UTF-8"));
             content = chapterInfo.append(content);
             writer.write(content.toString());
         } catch (IOException e) {
-            e.printStackTrace();
+            log.printStackTrace(e);
         } finally {
             if (reader != null) {
                 try {
                     reader.close();
                 } catch (IOException e) {
-                    e.printStackTrace();
+                    log.printStackTrace(e);
                 }
             }
             if (writer != null) {
                 try {
                     writer.close();
                 } catch (IOException e) {
-                    e.printStackTrace();
+                    log.printStackTrace(e);
                 }
             }
         }
@@ -407,15 +401,16 @@ public class TexProcess {
     /**
      * Generate the main tex file using the map of part name and the corresponding list of tex files.
      * Inject the file names into the main file at certain position.
-     * @param trimmedTexMap
+     *
+     * @param trimmedTexMap trimmed files stored in a map by the folder it lies.
      */
-    private void generateMainFile(HashMap<File, List<File>> trimmedTexMap) {
+    private void generateMainFile(Map<File, List<File>> trimmedTexMap) {
         StringBuilder injectContent = new StringBuilder();
         for (File folder : partFolders) {
             for (File trimmedTexFile : trimmedTexMap.get(folder)) {
                 injectContent.append("\\input{").append(trimmedTexFile.getPath().replace('\\', '/'))
                         .append("}\n");
-                if (logLevel >= Logger.HIGH) log.println("File: " + trimmedTexFile.getPath() + " injected into main file.");
+                log.println("File: " + trimmedTexFile.getPath() + " injected into main file.", Logger.HIGH);
             }
         }
         BufferedReader reader = null;
@@ -437,25 +432,25 @@ public class TexProcess {
                     }
                 }
             } catch (IOException e) {
-                e.printStackTrace();
+                log.printStackTrace(e);
             }
             writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(mainFile), "UTF-8"));
             writer.write(content.toString());
         } catch (IOException e1) {
-            e1.printStackTrace();
+            log.printStackTrace(e1);
         } finally {
             if (reader != null) {
                 try {
                     reader.close();
                 } catch (IOException e1) {
-                    e1.printStackTrace();
+                    log.printStackTrace(e1);
                 }
             }
             if (writer != null) {
                 try {
                     writer.close();
                 } catch (IOException e1) {
-                    e1.printStackTrace();
+                    log.printStackTrace(e1);
                 }
             }
         }
