@@ -43,7 +43,7 @@ public class ProcessFiles implements Runnable {
 
     /**
      * Ensure the existence of important files. If one of them do not exist, terminate the whole process.
-     * @return {@code true} if all exist, otherwise {@ocde false}
+     * @return {@code true} if all exist, otherwise {@code false}
      */
     private boolean ensureExistence() {
         if (!headerFile.exists()) {

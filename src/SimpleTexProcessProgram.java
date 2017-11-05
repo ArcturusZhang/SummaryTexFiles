@@ -21,13 +21,14 @@ public class SimpleTexProcessProgram {
     private JButton mainFileBrowseButton;
     private JButton confirmButton;
     private JTextArea logField;
-    private JScrollPane scrollPane;
+    private JScrollPane logScrollPane;
     private JCheckBox asySortCheckBox;
     private JTextField figTextField;
     private JButton figBrowseButton;
     private JFrame logFrame;
     private JList<String> texFilesList;
     private DefaultListModel<String> listModel;
+    private JScrollPane listScrollPane;
     private JCheckBox ignoreWrongFilenameCheckBox;
     private JCheckBox autoSortCheckButton;
     private JButton insertButton;
@@ -73,11 +74,13 @@ public class SimpleTexProcessProgram {
                 120, Constants.COMPONENT_HEIGHT);
         listModel = new DefaultListModel<>();
         texFilesList = new JList<>(listModel);
-        texFilesList.setBorder(BorderFactory.createTitledBorder("需要插入的Tex文件"));
-        texFilesList.setBounds(Constants.MARGIN_GAP, figLabel.getY() + figLabel.getHeight() + Constants.MARGIN_GAP,
+        listScrollPane = new JScrollPane(texFilesList, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
+                JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+        listScrollPane.setBorder(BorderFactory.createTitledBorder("需要插入的Tex文件"));
+        listScrollPane.setBounds(Constants.MARGIN_GAP, figLabel.getY() + figLabel.getHeight() + Constants.MARGIN_GAP,
                 525, 625);
         autoSortCheckButton = new JCheckBox("自动排序");
-        autoSortCheckButton.setBounds(texFilesList.getX() + texFilesList.getWidth() + Constants.MARGIN_GAP, texFilesList.getY(),
+        autoSortCheckButton.setBounds(listScrollPane.getX() + listScrollPane.getWidth() + Constants.MARGIN_GAP, listScrollPane.getY(),
                 90, Constants.COMPONENT_HEIGHT);
         ignoreWrongFilenameCheckBox = new JCheckBox("忽略错误");
         ignoreWrongFilenameCheckBox.setBounds(autoSortCheckButton.getX(),
@@ -129,11 +132,11 @@ public class SimpleTexProcessProgram {
         logField.setForeground(Color.black);
         DefaultCaret caret = (DefaultCaret) logField.getCaret();
         caret.setUpdatePolicy(DefaultCaret.ALWAYS_UPDATE);
-        scrollPane = new JScrollPane(logField, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
+        logScrollPane = new JScrollPane(logField, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
                 JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
-        scrollPane.setBounds(Constants.MARGIN_GAP, Constants.MARGIN_GAP,
+        logScrollPane.setBounds(Constants.MARGIN_GAP, Constants.MARGIN_GAP,
                 logFrame.getWidth() - 2 * Constants.MARGIN_GAP, 720);
-        logFrame.add(scrollPane);
+        logFrame.add(logScrollPane);
     }
 
     private void initMainFrame() {
@@ -170,7 +173,7 @@ public class SimpleTexProcessProgram {
         mainFrame.add(figLabel);
         mainFrame.add(figTextField);
         mainFrame.add(figBrowseButton);
-        mainFrame.add(texFilesList);
+        mainFrame.add(listScrollPane);
         mainFrame.add(autoSortCheckButton);
         mainFrame.add(ignoreWrongFilenameCheckBox);
         mainFrame.add(insertButton);
@@ -272,8 +275,8 @@ public class SimpleTexProcessProgram {
         return logField;
     }
 
-    public JScrollPane getScrollPane() {
-        return scrollPane;
+    public JScrollPane getLogScrollPane() {
+        return logScrollPane;
     }
 
     public JCheckBox getAsySortCheckBox() {
