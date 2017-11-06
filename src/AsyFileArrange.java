@@ -9,9 +9,10 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-public class AsyFileArrange {
+@SuppressWarnings("ALL")
+class AsyFileArrange {
     private File figureFolder;
-    private Logger log;
+    private final Logger log;
 
     AsyFileArrange(File figureFolder) {
         this.figureFolder = figureFolder;
@@ -26,6 +27,7 @@ public class AsyFileArrange {
         ArrayList<File> asyFileList = new ArrayList<>();
         ArrayList<File> folderList = new ArrayList<>();
         try {
+            //noinspection ConstantConditions
             for (File file : figureFolder.listFiles()) {
                 if (file.getName().endsWith(".asy")) asyFileList.add(file);
                 if (file.isDirectory() && file.getName().matches("^size([\\d]+)$")) {

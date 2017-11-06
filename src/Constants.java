@@ -1,4 +1,4 @@
-public class Constants {
-    public static int MARGIN_GAP = 10;
-    public static int COMPONENT_HEIGHT = 25;
+class Constants {
+    public static final int MARGIN_GAP = 10;
+    public static final int COMPONENT_HEIGHT = 25;
 }

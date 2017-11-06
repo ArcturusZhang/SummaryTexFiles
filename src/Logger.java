@@ -1,5 +1,6 @@
 import javax.swing.*;
 
+@SuppressWarnings("WeakerAccess")
 public class Logger {
     public final static int LOW = 0;
     public final static int MEDIUM = 1;

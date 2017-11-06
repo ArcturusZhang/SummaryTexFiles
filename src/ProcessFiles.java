@@ -4,7 +4,7 @@ import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-public class ProcessFiles implements Runnable {
+class ProcessFiles implements Runnable {
     private final String headerFileName = "header.tex";
     private final String indexContentFilename = "indexcontent.tex";
     private File mainFile;
@@ -14,7 +14,7 @@ public class ProcessFiles implements Runnable {
     private File indexContentFile;
     private List<File> partFolders;
     private SimpleTexProcessProgram mainWindow;
-    private Logger log;
+    private final Logger log;
     private Process process;
 
     ProcessFiles(String mainFilePath, String figFolderPath) {
@@ -43,14 +43,28 @@ public class ProcessFiles implements Runnable {
 
     /**
      * Ensure the existence of important files. If one of them do not exist, terminate the whole process.
+     *
      * @return {@code true} if all exist, otherwise {@code false}
      */
     private boolean ensureExistence() {
+        boolean flag = true;
         if (!headerFile.exists()) {
             log.println("Header file: " + headerFile.getPath() + "does not exist.");
-            return false;
+            flag = false;
         }
-        return true;
+        if (!mainFile.exists()) {
+            log.println("Main tex file: " + mainFile.getPath() + "does not exist.");
+            flag = false;
+        }
+        if (!partFolder.exists()) {
+            log.println("Part folder: " + partFolder.getPath() + "does not exist.");
+            flag = false;
+        }
+        if (!figureFolder.exists()) {
+            log.println("Figure folder: " + figureFolder.getPath() + "does not exist.");
+            flag = false;
+        }
+        return flag;
     }
 
     /**
@@ -72,7 +86,7 @@ public class ProcessFiles implements Runnable {
                 asyFileArrange.arrangeAsyFiles();
             }
             ArrayList<File> inputRawTexFiles = getInputFiles();
-            TexProcess texProcess = new TexProcess(inputRawTexFiles, mainFile, figureFolder, partFolder, headerFile, partFolders);
+            TexProcess texProcess = new TexProcess(inputRawTexFiles, mainFile, figureFolder, headerFile, partFolders);
             texProcess.process();
             int result = JOptionPane.showConfirmDialog(mainWindow.getMainFrame(),
                     "合并已完成，是否编译文件" + mainFile.getName() + "?", "合并完成", JOptionPane.YES_NO_OPTION);
@@ -169,7 +183,7 @@ public class ProcessFiles implements Runnable {
                 }
                 if (line.trim().startsWith("\\begin{theindex}")) indexBeginFlag = true;
             }
-            writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(indexContentFile),"UTF-8"));
+            writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(indexContentFile), "UTF-8"));
             writer.write(indexContent.toString());
         } catch (FileNotFoundException e) {
             log.println("Index file " + mainFile.getPath().replace(".tex", ".ind") + "not found.");
@@ -195,6 +209,7 @@ public class ProcessFiles implements Runnable {
 
     /**
      * Extract a list of files selected.
+     *
      * @return a list of tex files.
      */
     private ArrayList<File> getInputFiles() {

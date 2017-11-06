@@ -6,24 +6,28 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-public class TexProcess {
+@SuppressWarnings("ConstantConditions")
+class TexProcess {
+    private static final Pattern filenamePattern = Pattern.compile("^(\\s*\\\\includegraphics\\[(width|height)\\s*=\\s*)(\\S+)(\\]\\{)(\\S+)(\\}\\S*\\s*)$");
+    private static final Pattern sizePattern = Pattern.compile("/size(\\d+)/");
+    private static final Pattern chapterPattern = Pattern.compile("^(\\s*\\\\chapter)\\{([\\s\\S]+)\\}(\\s*)$");
+    private static final Pattern sectionPattern = Pattern.compile("^(\\s*\\\\section)\\{(\\W+)\\}(\\s*)$");
+    private static final Pattern subsectionPattern = Pattern.compile("^(\\s*\\\\subsection)\\{(\\W+)\\}(\\s*)$");
+    private final Logger log;
     private File mainFile;
     private File figureFolder;
-    private File partFolder;
-    private Logger log;
     private File headerFile;
     private int warningCount = 0;
     private List<File> inputRawTexFiles;
     private List<File> partFolders;
 
-    TexProcess(List<File> inputRawTexFiles, File mainFile, File figureFolder, File partFolder, File headerFile,
+    TexProcess(List<File> inputRawTexFiles, File mainFile, File figureFolder, File headerFile,
                List<File> partFolders) {
         this.mainFile = mainFile;
         this.figureFolder = figureFolder;
         this.inputRawTexFiles = inputRawTexFiles;
         this.log = Logger.getLog();
         this.headerFile = headerFile;
-        this.partFolder = partFolder;
         this.partFolders = partFolders;
         for (File folder : partFolders) {
             if (!folder.exists()) folder.mkdir();
@@ -64,6 +68,7 @@ public class TexProcess {
 
     /**
      * categorize the input tex files by their filename.
+     *
      * @param inputRawTexFiles input tex files
      * @return a map describe the result of categorization.
      */
@@ -128,7 +133,7 @@ public class TexProcess {
     /**
      * Count how many of '}' at the end of the given String.
      *
-     * @param path
+     * @param path file path which may contains ending braces
      * @return the count of '}' at the end of path.
      */
     private int countEndingBraces(String path) {
@@ -148,6 +153,7 @@ public class TexProcess {
      * @param filename the target file name
      * @return a list of found files
      */
+    @SuppressWarnings("ConstantConditions")
     private List<File> findByFileName(File folder, String filename) {
         List<File> foundList = new ArrayList<>();
         for (File file : folder.listFiles()) {
@@ -164,8 +170,8 @@ public class TexProcess {
     /**
      * A formula to calculate the width of figure with certain size.
      *
-     * @param size
-     * @return
+     * @param size size of figure
+     * @return the width of figure in centimeter
      */
     private String getWidth(int size) {
         double width = 13.0 / 500 * size;
@@ -177,8 +183,8 @@ public class TexProcess {
      * A trimmed tex file is a file whose full name ended with "-trim.tex".
      * The list is sorted by the ordinal number which is contained in the filename.
      *
-     * @param folder
-     * @return
+     * @param folder file instance of a folder
+     * @return a list of trimmed tex files (whose filename ends with "-trim.tex")
      */
     private List<File> getTrimmedTexFileInFolder(File folder) {
         List<File> files = new ArrayList<>();
@@ -203,7 +209,8 @@ public class TexProcess {
 
     /**
      * Reader the content of a tex file, transfer the main part of it to the trimmed tex file.
-     * @param folder the corresponding folder of the trimmed file
+     *
+     * @param folder  the corresponding folder of the trimmed file
      * @param texFile the raw tex file.
      */
     private void processTexFile(File folder, File texFile) {
@@ -261,6 +268,7 @@ public class TexProcess {
      * Third tweak the {@code includegraphics} line. Ensure the existence of the figure intended to include,
      * calculate and correct the width of the figure. Print warnings if the figure file does not exist or the
      * figure file duplicates.
+     *
      * @param trimmedFile current file
      */
     private void decorateTrimmedFile(File trimmedFile) {
@@ -272,11 +280,6 @@ public class TexProcess {
             reader = new BufferedReader(new InputStreamReader(new FileInputStream(trimmedFile), "UTF-8"));
             String line;
             try {
-                Pattern filenamePattern = Pattern.compile("^(\\s*\\\\includegraphics\\[(width|height)\\s*=\\s*)(\\S+)(\\]\\{)(\\S+)(\\}\\S*\\s*)$");
-                Pattern sizePattern = Pattern.compile("/size(\\d+)/");
-                Pattern chapterPattern = Pattern.compile("^(\\s*\\\\chapter)\\{([\\s\\S]+)\\}(\\s*)$");
-                Pattern sectionPattern = Pattern.compile("^(\\s*\\\\section)\\{(\\W+)\\}(\\s*)$");
-                Pattern subsectionPattern = Pattern.compile("^(\\s*\\\\subsection)\\{(\\W+)\\}(\\s*)$");
                 int lineNumber = 1;
                 while ((line = reader.readLine()) != null) {
                     // decorate the chapter line
@@ -307,7 +310,7 @@ public class TexProcess {
                                     + " of file " + trimmedFile.getPath(), Logger.MEDIUM);
                         }
                         chapterInfo.append(line).append("\n").append("\\input{")
-                                .append(headerFile.getPath().replace("\\", "/")).append("}\n");
+                                .append(modifyPath(headerFile.getAbsolutePath())).append("}\n");
                     } else {
                         // decorate section title
                         Matcher sectionMatcher = sectionPattern.matcher(line);
@@ -346,7 +349,7 @@ public class TexProcess {
                             } else {
                                 StringBuilder newline = new StringBuilder();
                                 File newPicFile = picList.get(0);
-                                String newFilePath = newPicFile.getPath().replace('\\', '/');
+                                String newFilePath = modifyPath(newPicFile.getAbsolutePath());
                                 String newSize;
                                 Matcher sizeMatcher = sizePattern.matcher(newFilePath);
                                 // get the size information for the picture file
@@ -408,7 +411,7 @@ public class TexProcess {
         StringBuilder injectContent = new StringBuilder();
         for (File folder : partFolders) {
             for (File trimmedTexFile : trimmedTexMap.get(folder)) {
-                injectContent.append("\\input{").append(trimmedTexFile.getPath().replace('\\', '/'))
+                injectContent.append("\\input{").append(modifyPath(trimmedTexFile.getAbsolutePath()))
                         .append("}\n");
                 log.println("File: " + trimmedTexFile.getPath() + " injected into main file.", Logger.HIGH);
             }
@@ -454,5 +457,18 @@ public class TexProcess {
                 }
             }
         }
+    }
+
+    /**
+     * Since the tex system do not accept a path with any spaces, this method intends to trim any path before the
+     * main file's folder which will be replaced by "."
+     *
+     * @param path The full path may contains spaces.
+     * @return the relative path to the position of the main file (which is guaranteed that will not contains any
+     * spaces).
+     */
+    private String modifyPath(String path) {
+        String pathPrefix = mainFile.getAbsolutePath().replace(mainFile.getName(), "");
+        return path.replace(pathPrefix, "./").replace(" ", "_").replace("\\", "/");
     }
 }

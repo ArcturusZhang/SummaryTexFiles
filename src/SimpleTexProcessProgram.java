@@ -11,7 +11,7 @@ import java.io.File;
 /**
  * Main class of the simple program. The names of variables and method implies their purpose
  */
-public class SimpleTexProcessProgram {
+final class SimpleTexProcessProgram {
     static SimpleTexProcessProgram mainWindow;
     private static String previousFileChooserPath = ".";
     private JLabel mainFileLabel;

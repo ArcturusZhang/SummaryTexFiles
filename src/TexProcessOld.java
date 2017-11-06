@@ -9,7 +9,7 @@ import java.util.regex.Pattern;
 @Deprecated
 public class TexProcessOld {
     private final static String ORIGINAL_FOLDER_NAME = "originalTexes";
-    static PrintStream log;
+    private static PrintStream log;
     private static int warningCount = 0;
     private static String headerPath = "." + File.separator + "parts" + File.separator + "header.tex";
 
@@ -69,7 +69,7 @@ public class TexProcessOld {
      * @param string string need decorate
      * @return decorated string.
      */
-    static String decorateSection(String string) {
+    private static String decorateSection(String string) {
         String separator;
         switch (string.length()) {
             case 2:
@@ -105,7 +105,7 @@ public class TexProcessOld {
      *
      * @param trimmedFile
      */
-    static void decorateTrimmedFile(File trimmedFile) {
+    private static void decorateTrimmedFile(File trimmedFile) {
         BufferedReader reader = null;
         BufferedWriter writer = null;
         StringBuilder content = new StringBuilder();
@@ -123,7 +123,6 @@ public class TexProcessOld {
                 Pattern subsectionPattern = Pattern.compile("^(\\s*\\\\subsection)\\{(\\W+)\\}(\\s*)$");
                 int lineNumber = 1;
                 File figureFolder = new File("." + File.separator + "fig");
-                boolean flag = false;
                 while ((line = reader.readLine()) != null) {
                     // decorate the chapter line
                     Matcher chapterMatcher = chapterPattern.matcher(line);
@@ -245,7 +244,7 @@ public class TexProcessOld {
      * @param path
      * @return the count of '}' at the end of path.
      */
-    static int countEndingBraces(String path) {
+    private static int countEndingBraces(String path) {
         int pos = path.length() - 1;
         int braceCount = 0;
         while (path.charAt(pos) == '}') {
@@ -262,7 +261,7 @@ public class TexProcessOld {
      * @param filename the target file name
      * @return a list of found files
      */
-    static List<File> findByFileName(File folder, String filename) {
+    private static List<File> findByFileName(File folder, String filename) {
         List<File> foundList = new ArrayList<>();
         for (File file : folder.listFiles()) {
             if (file.isDirectory()) foundList.addAll(findByFileName(file, filename));
@@ -281,7 +280,7 @@ public class TexProcessOld {
      * @param size
      * @return
      */
-    static String getWidth(int size) {
+    private static String getWidth(int size) {
         double width = 13.0 / 500 * size;
         return String.format("%.2f", width);
     }
@@ -293,7 +292,7 @@ public class TexProcessOld {
      * @param mainFile
      * @param map
      */
-    static void generateMainFile(File mainFile, TreeMap<String, List<File>> map) {
+    private static void generateMainFile(File mainFile, TreeMap<String, List<File>> map) {
         StringBuilder injectContent = new StringBuilder();
         Iterator<String> iterator = map.keySet().iterator();
         while (iterator.hasNext()) {
@@ -352,7 +351,7 @@ public class TexProcessOld {
      * @param folder
      * @return
      */
-    static List<File> getTexFilesInFolder(File folder) {
+    private static List<File> getTexFilesInFolder(File folder) {
         List<File> files = new ArrayList<>();
         for (File texFile : folder.listFiles()) {
             if (texFile.getName().endsWith(".tex") && !texFile.getName().endsWith("-trim.tex")) {
@@ -370,7 +369,7 @@ public class TexProcessOld {
      * @param folder
      * @return
      */
-    static List<File> getTrimmedTexFileInFolder(File folder) {
+    private static List<File> getTrimmedTexFileInFolder(File folder) {
         List<File> files = new ArrayList<>();
         for (File trimmedFile : folder.listFiles()) {
             if (trimmedFile.getName().endsWith("-trim.tex")) {
@@ -397,7 +396,7 @@ public class TexProcessOld {
      * @param texFile
      * @return
      */
-    static File processTexFile(File texFile) {
+    private static void processTexFile(File texFile) {
         BufferedReader reader = null;
         BufferedWriter writer = null;
         String path = texFile.getPath();
@@ -451,6 +450,5 @@ public class TexProcessOld {
             if (originalFile.exists()) originalFile.delete();
             texFile.renameTo(originalFile);
         }
-        return trimmedFile;
     }
 }
