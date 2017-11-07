@@ -5,7 +5,7 @@ public class Logger {
     public final static int LOW = 0;
     public final static int MEDIUM = 1;
     public final static int HIGH = 2;
-    private static Logger log = null;
+    private static Logger log = new Logger();
     private static int LOG_LEVEL = MEDIUM;
     private JTextArea logField = null;
 
@@ -31,9 +31,9 @@ public class Logger {
     }
 
     public synchronized static Logger getLog() {
-        if (log == null) {
-            log = new Logger();
-        }
+//        if (log == null) {
+//            log = new Logger();
+//        }
         return log;
     }
 

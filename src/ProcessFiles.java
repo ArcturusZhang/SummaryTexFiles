@@ -16,14 +16,21 @@ class ProcessFiles implements Runnable {
     private SimpleTexProcessProgram mainWindow;
     private final Logger log;
     private Process process;
+    private boolean needArrange;
+    private boolean deleteDuplicated;
 
-    ProcessFiles(String mainFilePath, String figFolderPath) {
+    ProcessFiles(String mainFilePath, String figFolderPath, boolean needArrange, boolean deleteDuplicated) {
         this.mainFile = new File(mainFilePath);
         this.figureFolder = new File(figFolderPath);
+        this.needArrange = needArrange;
+        this.deleteDuplicated = deleteDuplicated;
         this.mainWindow = SimpleTexProcessProgram.mainWindow;
         this.log = Logger.getLog();
-        log.setLogField(mainWindow.getLogField());
         initialize();
+    }
+
+    ProcessFiles(String mainFilePath, String figFolderPath) {
+        this(mainFilePath, figFolderPath, true, true);
     }
 
     /**
@@ -81,9 +88,10 @@ class ProcessFiles implements Runnable {
         if (ensureExistence()) {
             mainWindow.lockComponents();
             Logger.setLogLevel(Logger.LOW);
-            if (mainWindow.getAsySortCheckBox().isSelected()) {
-                AsyFileArrange asyFileArrange = new AsyFileArrange(figureFolder);
-                asyFileArrange.arrangeAsyFiles();
+            if (needArrange) {
+                AsyFileArrange arrange = new AsyFileArrange(figureFolder);
+                if (deleteDuplicated) arrange.removeDuplicatedFilesByLastModified();
+                arrange.arrangeAsyFiles();
             }
             ArrayList<File> inputRawTexFiles = getInputFiles();
             TexProcess texProcess = new TexProcess(inputRawTexFiles, mainFile, figureFolder, headerFile, partFolders);
@@ -244,7 +252,7 @@ class ProcessFiles implements Runnable {
                 }
             }
         }
-        if (!inputRawTexFiles.isEmpty() && mainWindow.getAsySortCheckBox().isSelected()) {
+        if (!inputRawTexFiles.isEmpty() && mainWindow.getAsyArrangeCheckBox().isSelected()) {
             Comparator<File> fileComparator = (File file1, File file2) -> {
                 char c1 = file1.getName().charAt(0);
                 char c2 = file2.getName().charAt(0);

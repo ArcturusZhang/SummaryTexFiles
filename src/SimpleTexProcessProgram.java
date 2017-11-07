@@ -13,6 +13,7 @@ import java.io.File;
  */
 final class SimpleTexProcessProgram {
     static SimpleTexProcessProgram mainWindow;
+    private Logger log;
     private static String previousFileChooserPath = ".";
     private JLabel mainFileLabel;
     private JLabel figLabel;
@@ -22,7 +23,8 @@ final class SimpleTexProcessProgram {
     private JButton confirmButton;
     private JTextArea logField;
     private JScrollPane logScrollPane;
-    private JCheckBox asySortCheckBox;
+    private JCheckBox asyArrangeCheckBox;
+    private JCheckBox deleteDuplicatedCheckBox;
     private JTextField figTextField;
     private JButton figBrowseButton;
     private JFrame logFrame;
@@ -41,6 +43,7 @@ final class SimpleTexProcessProgram {
     private Thread processThread;
     private ProcessFiles processFiles;
     private JButton terminateButton;
+    private JButton generateFigTexFile;
 
     private SimpleTexProcessProgram() {
         mainFrame = new JFrame("Simple Tex Process Program");
@@ -69,16 +72,22 @@ final class SimpleTexProcessProgram {
         figBrowseButton = new JButton("浏览");
         figBrowseButton.setBounds(mainFileBrowseButton.getX(), figTextField.getY(),
                 mainFileBrowseButton.getWidth(), Constants.COMPONENT_HEIGHT);
-        asySortCheckBox = new JCheckBox("整理图片文件夹");
-        asySortCheckBox.setBounds(confirmButton.getX(), figBrowseButton.getY(),
+        asyArrangeCheckBox = new JCheckBox("整理图片文件夹");
+        asyArrangeCheckBox.setBounds(confirmButton.getX(), figBrowseButton.getY(),
                 120, Constants.COMPONENT_HEIGHT);
+        generateFigTexFile = new JButton("生成图片列表");
+        generateFigTexFile.setBounds(Constants.MARGIN_GAP, figLabel.getY() + figLabel.getHeight() + Constants.MARGIN_GAP,
+                120, Constants.COMPONENT_HEIGHT);
+        deleteDuplicatedCheckBox = new JCheckBox("删除重复图片");
+        deleteDuplicatedCheckBox.setToolTipText("保留修改时间较新的图片文件");
+        deleteDuplicatedCheckBox.setBounds(asyArrangeCheckBox.getX(), generateFigTexFile.getY(), 120, Constants.COMPONENT_HEIGHT);
         listModel = new DefaultListModel<>();
         texFilesList = new JList<>(listModel);
         listScrollPane = new JScrollPane(texFilesList, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
                 JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
         listScrollPane.setBorder(BorderFactory.createTitledBorder("需要插入的Tex文件"));
-        listScrollPane.setBounds(Constants.MARGIN_GAP, figLabel.getY() + figLabel.getHeight() + Constants.MARGIN_GAP,
-                525, 625);
+        listScrollPane.setBounds(Constants.MARGIN_GAP, generateFigTexFile.getY() + generateFigTexFile.getHeight() + Constants.MARGIN_GAP,
+                525, 600);
         autoSortCheckButton = new JCheckBox("自动排序");
         autoSortCheckButton.setBounds(listScrollPane.getX() + listScrollPane.getWidth() + Constants.MARGIN_GAP, listScrollPane.getY(),
                 90, Constants.COMPONENT_HEIGHT);
@@ -114,6 +123,8 @@ final class SimpleTexProcessProgram {
         initMainFrame();
         initLogFrame();
         setToDefault();
+        this.log = Logger.getLog();
+        log.setLogField(logField);
     }
 
     public static void main(String[] args) {
@@ -145,7 +156,8 @@ final class SimpleTexProcessProgram {
     }
 
     private void setToDefault() {
-        asySortCheckBox.setSelected(true);
+        asyArrangeCheckBox.setSelected(true);
+        deleteDuplicatedCheckBox.setSelected(true);
         autoSortCheckButton.setSelected(true);
         ignoreWrongFilenameCheckBox.setSelected(false);
         deleteButton.setEnabled(false);
@@ -169,7 +181,7 @@ final class SimpleTexProcessProgram {
         mainFrame.add(mainFileTextField);
         mainFrame.add(mainFileBrowseButton);
         mainFrame.add(confirmButton);
-        mainFrame.add(asySortCheckBox);
+        mainFrame.add(asyArrangeCheckBox);
         mainFrame.add(figLabel);
         mainFrame.add(figTextField);
         mainFrame.add(figBrowseButton);
@@ -184,6 +196,8 @@ final class SimpleTexProcessProgram {
         mainFrame.add(showLogButton);
         mainFrame.add(clearLogButton);
         mainFrame.add(terminateButton);
+        mainFrame.add(generateFigTexFile);
+        mainFrame.add(deleteDuplicatedCheckBox);
     }
 
     private void addActionListeners() {
@@ -229,6 +243,14 @@ final class SimpleTexProcessProgram {
                 logField.setText("");
             }
         });
+        generateFigTexFile.addActionListener(e -> {
+            if (e.getSource() == generateFigTexFile) {
+                FigureListGenerator figureListGenerator
+                        = new FigureListGenerator("figurelist.tex", figTextField.getText(),
+                        asyArrangeCheckBox.isSelected(), deleteDuplicatedCheckBox.isSelected());
+                new Thread(figureListGenerator).start();
+            }
+        });
     }
 
     public void lockComponents() {
@@ -241,12 +263,14 @@ final class SimpleTexProcessProgram {
         confirmButton.setVisible(true);
         terminateButton.setVisible(false);
         setEnabled(true);
+        logField.setCaretPosition(logField.getDocument().getLength());
     }
 
     private void setEnabled(boolean enabled) {
         mainFileTextField.setEnabled(enabled);
         confirmButton.setEnabled(enabled);
-        asySortCheckBox.setEnabled(enabled);
+        asyArrangeCheckBox.setEnabled(enabled);
+        deleteDuplicatedCheckBox.setEnabled(enabled);
         mainFileBrowseButton.setEnabled(enabled);
         figBrowseButton.setEnabled(enabled);
         figTextField.setEnabled(enabled);
@@ -257,6 +281,7 @@ final class SimpleTexProcessProgram {
         showLogButton.setEnabled(enabled);
         clearLogButton.setEnabled(enabled);
         terminateButton.setEnabled(!enabled);
+        generateFigTexFile.setEnabled(enabled);
     }
 
     public JFrame getMainFrame() {
@@ -279,8 +304,8 @@ final class SimpleTexProcessProgram {
         return logScrollPane;
     }
 
-    public JCheckBox getAsySortCheckBox() {
-        return asySortCheckBox;
+    public JCheckBox getAsyArrangeCheckBox() {
+        return asyArrangeCheckBox;
     }
 
     public JButton getMainFileBrowseButton() {
