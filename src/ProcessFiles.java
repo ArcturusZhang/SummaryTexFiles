@@ -49,19 +49,19 @@ class ProcessFiles implements Runnable {
     private boolean ensureExistence() {
         boolean flag = true;
         if (!headerFile.exists()) {
-            log.println("Header file: " + headerFile.getPath() + "does not exist.");
+            log.println("Header file: " + headerFile.getPath() + " does not exist.");
             flag = false;
         }
         if (!mainFile.exists()) {
-            log.println("Main tex file: " + mainFile.getPath() + "does not exist.");
+            log.println("Main tex file: " + mainFile.getPath() + " does not exist.");
             flag = false;
         }
         if (!partFolder.exists()) {
-            log.println("Part folder: " + partFolder.getPath() + "does not exist.");
+            log.println("Part folder: " + partFolder.getPath() + " does not exist.");
             flag = false;
         }
         if (!figureFolder.exists()) {
-            log.println("Figure folder: " + figureFolder.getPath() + "does not exist.");
+            log.println("Figure folder: " + figureFolder.getPath() + " does not exist.");
             flag = false;
         }
         return flag;
@@ -91,6 +91,7 @@ class ProcessFiles implements Runnable {
             int result = JOptionPane.showConfirmDialog(mainWindow.getMainFrame(),
                     "合并已完成，是否编译文件" + mainFile.getName() + "?", "合并完成", JOptionPane.YES_NO_OPTION);
             if (result == JOptionPane.YES_OPTION) {
+                deleteTempFiles();
                 compileMainFile();
                 makeIndex();
                 generateIndexContent();
@@ -99,6 +100,18 @@ class ProcessFiles implements Runnable {
                         JOptionPane.INFORMATION_MESSAGE);
             }
             mainWindow.unlockComponents();
+        }
+    }
+
+    private void deleteTempFiles() {
+        File currentFolder = new File(mainFile.getAbsolutePath().replace(mainFile.getName(), ""));
+        String mainFileNameWithoutExtension = mainFile.getName().replace(".tex", "");
+        for (File file : currentFolder.listFiles()) {
+            if (file.isFile() && file.getName().startsWith(mainFileNameWithoutExtension) && !file.getName().endsWith(".tex")) {
+                if (file.delete()) {
+                    log.println("Delete file: " + file.getName());
+                }
+            }
         }
     }
 

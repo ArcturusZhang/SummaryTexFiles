@@ -14,18 +14,18 @@ class TexProcess {
     private static final Pattern sectionPattern = Pattern.compile("^(\\s*\\\\section)\\{(\\W+)\\}(\\s*)$");
     private static final Pattern subsectionPattern = Pattern.compile("^(\\s*\\\\subsection)\\{(\\W+)\\}(\\s*)$");
     private final Logger log;
+    private int warningCount = 0;
+    private List<File> inputRawTexFiles;
     private File mainFile;
     private File figureFolder;
     private File headerFile;
-    private int warningCount = 0;
-    private List<File> inputRawTexFiles;
     private List<File> partFolders;
 
     TexProcess(List<File> inputRawTexFiles, File mainFile, File figureFolder, File headerFile,
                List<File> partFolders) {
+        this.inputRawTexFiles = inputRawTexFiles;
         this.mainFile = mainFile;
         this.figureFolder = figureFolder;
-        this.inputRawTexFiles = inputRawTexFiles;
         this.log = Logger.getLog();
         this.headerFile = headerFile;
         this.partFolders = partFolders;
