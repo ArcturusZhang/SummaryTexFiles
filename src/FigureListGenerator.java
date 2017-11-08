@@ -9,16 +9,16 @@ public class FigureListGenerator implements Runnable {
     private static final Pattern CONTAINS_CHINESE_PATTERN = Pattern.compile("[\\u4e00-\\u9fa5]");
     private static final String FILE_HEAD = "\\documentclass{ctexart}\n" + "\\begin{document}\n";
     private static final String FILE_TAIL = "\\end{document}";
-//    private static final String FIGURE_HEAD = "\\begin{figure}[htbp!]\n" + "\\centering\n" + "\\includegraphics{";
+    //    private static final String FIGURE_HEAD = "\\begin{figure}[htbp!]\n" + "\\centering\n" + "\\includegraphics{";
     private static final String FIGURE_HEAD = "\\begin{figure}\n" + "\\centering\n" + "\\includegraphics{";
     private static final String FIGURE_BODY = "}\n" + "\\caption{";
     private static final String FIGURE_TAIL = "}\n" + "\\end{figure}\n";
     private static final String CLEAR_PAGE = "\\clearpage\n";
+    private final int clearPageCount = 20;
     private File figureListFile;
     private File figureFolder;
     private Logger log;
     private boolean isChineseFilenameExcluded = true;
-    private final int clearPageCount = 20;
     private SimpleTexProcessProgram mainWindow;
     private boolean needArrange;
     private boolean deleteDuplicated;
@@ -40,12 +40,25 @@ public class FigureListGenerator implements Runnable {
         this(new File(figureListFilePath), new File(figFolderPath), true, true);
     }
 
-    public void generate() {
+    private void arrangeAndRemoveDuplicated() {
         if (needArrange) {
             AsyFileArrange arrange = new AsyFileArrange(figureFolder);
-            if (deleteDuplicated) arrange.removeDuplicatedFilesByLastModified();
+            if (deleteDuplicated) {
+                boolean flag = arrange.listDuplicateFiles();
+                if (flag) {
+                    int result = JOptionPane.showConfirmDialog(mainWindow.getMainFrame(),
+                            "检测到重复的文件，是否删除重复文件，只保留同名文件中最后更新的文件？", "检测完成",
+                            JOptionPane.YES_NO_OPTION);
+                    if (result == JOptionPane.YES_OPTION) {
+                        arrange.removeDuplicatedFilesByLastModified();
+                    }
+                }
+            }
             arrange.arrangeAsyFiles();
         }
+    }
+
+    private void generateFigureList() {
         log.println("============================================Generate start============================================");
         BufferedWriter writer = null;
         try {
@@ -127,7 +140,8 @@ public class FigureListGenerator implements Runnable {
     @Override
     public void run() {
         mainWindow.lockComponents();
-        generate();
+        arrangeAndRemoveDuplicated();
+        generateFigureList();
 //        int result = JOptionPane.showConfirmDialog(mainWindow.getMainFrame(),
 //                "合并已完成，是否编译文件" + mainFile.getName() + "?", "合并完成", JOptionPane.YES_NO_OPTION);
         JOptionPane.showMessageDialog(mainWindow.getMainFrame(), "已生成图片列表文件。", "已生成",

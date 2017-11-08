@@ -155,10 +155,22 @@ class TexProcess {
      */
     @SuppressWarnings("ConstantConditions")
     private List<File> findByFileName(File folder, String filename) {
+        return findByFileName(folder, filename, true);
+    }
+
+    private boolean isLegalFolderName(File file, boolean ignoreIllegalFolders) {
+        if (ignoreIllegalFolders) {
+            return file.getName().matches("^size([\\d]+)$");
+        }
+        return true;
+    }
+
+    private List<File> findByFileName(File folder, String filename, boolean ignoreIllegalFolders) {
         List<File> foundList = new ArrayList<>();
         for (File file : folder.listFiles()) {
-            if (file.isDirectory()) foundList.addAll(findByFileName(file, filename));
-            else {
+            if (file.isDirectory() && isLegalFolderName(file, ignoreIllegalFolders)) {
+                foundList.addAll(findByFileName(file, filename, ignoreIllegalFolders));
+            } else {
                 if (file.getName().equals(filename)) {
                     foundList.add(file);
                 }

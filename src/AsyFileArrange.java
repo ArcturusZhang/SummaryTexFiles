@@ -8,7 +8,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 class AsyFileArrange {
-    private static final SimpleDateFormat FORMAT = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
+    private static final SimpleDateFormat FORMAT = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
     private final Logger log;
     private File figureFolder;
 
@@ -38,30 +38,71 @@ class AsyFileArrange {
         }
     }
 
-    public void removeDuplicatedFilesByLastModified() {
+    void removeDuplicatedFilesByLastModified() {
         Map<String, List<File>> duplicated = getDuplicateFiles();
         for (String filename : duplicated.keySet()) {
-            TreeMap<Long, File> sorted = new TreeMap<>();
+            TreeMap<Long, List<File>> sorted = new TreeMap<>();
             for (File asyFile : duplicated.get(filename)) {
-                sorted.put(asyFile.lastModified(), asyFile);
+                if (sorted.containsKey(asyFile.lastModified())) {
+                    sorted.get(asyFile.lastModified()).add(asyFile);
+                } else {
+                    List<File> list = new ArrayList<>();
+                    list.add(asyFile);
+                    sorted.put(asyFile.lastModified(), list);
+                }
             }
-            Iterator<Long> iterator = sorted.keySet().iterator();
-            int deleteCount = 0;
-            int size = duplicated.get(filename).size();
-            while (iterator.hasNext()) {
-                long time = iterator.next();
-                sorted.get(time).delete();
-                new File(sorted.get(time).getAbsolutePath().replace(".asy", ".pdf")).delete();
-                deleteCount++;
-                if (deleteCount == size - 1) break;
+            System.out.println(sorted);
+            File preserved = sorted.get(sorted.lastKey()).get(0);
+            for (List<File> list : sorted.values()) {
+                for (File asyFile : list) {
+                    if (asyFile == preserved) continue;
+                    File pdfFile = new File(asyFile.getAbsolutePath().replace(".asy", ".pdf"));
+                    if (asyFile.delete()) {
+                        log.println("Duplicated file: " + asyFile.getPath() + " (last modified: "
+                                + FORMAT.format(new Date(asyFile.lastModified())) + ") has been deleted.");
+                    } else {
+                        log.println("Sorry, an error occurred which causes the duplicated file: " + asyFile.getPath()
+                                + "(last modified: " + FORMAT.format(new Date(asyFile.lastModified()))
+                                + ") is not successfully deleted.");
+                    }
+                    if (pdfFile.exists() && pdfFile.delete()) {
+                        log.println("PDF file associated: " + pdfFile.getPath() + " has been deleted.");
+                    } else {
+                        log.println("Sorry, an error occurred which causes the duplicated file: " + pdfFile.getPath()
+                                + "is not successfully deleted or the pdf file does not exist.");
+                    }
+                }
             }
         }
+    }
+
+    /**
+     * List duplicated asy files in log, return true if there are duplicated files, otherwise return false.
+     *
+     * @return true if there are duplicates, false if not.
+     */
+    boolean listDuplicateFiles() {
+        Map<String, List<File>> duplicated = getDuplicateFiles();
+        if (duplicated.isEmpty()) {
+            log.println("No duplicated files.");
+        } else {
+            log.println("Duplicated files detected: ");
+            for (String filename : duplicated.keySet()) {
+                log.println("Filename: " + filename);
+                int count = 1;
+                for (File file : duplicated.get(filename)) {
+                    log.println("\t" + count + ". " + file.getPath() + ", last modified date: "
+                            + FORMAT.format(new Date(file.lastModified())));
+                    count++;
+                }
+            }
+        }
+        return !duplicated.isEmpty();
     }
 
     private Map<String, List<File>> getDuplicateFiles() {
         Map<String, List<File>> duplicated = new HashMap<>();
         getDuplicateFilesCore(figureFolder, duplicated);
-        String filename = null;
         Iterator<String> iterator = duplicated.keySet().iterator();
         while (iterator.hasNext()) {
             List<File> list = duplicated.get(iterator.next());
@@ -72,7 +113,7 @@ class AsyFileArrange {
 
     private void getDuplicateFilesCore(File folder, Map<String, List<File>> duplicated) {
         for (File file : folder.listFiles()) {
-            if (file.isDirectory()) {
+            if (file.isDirectory() && file.getName().matches("^size([\\d]+)$")) {
                 getDuplicateFilesCore(file, duplicated);
             }
             // only process asy files.

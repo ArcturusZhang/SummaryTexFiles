@@ -78,8 +78,7 @@ final class SimpleTexProcessProgram {
         generateFigTexFile = new JButton("生成图片列表");
         generateFigTexFile.setBounds(Constants.MARGIN_GAP, figLabel.getY() + figLabel.getHeight() + Constants.MARGIN_GAP,
                 120, Constants.COMPONENT_HEIGHT);
-        deleteDuplicatedCheckBox = new JCheckBox("删除重复图片");
-        deleteDuplicatedCheckBox.setToolTipText("保留修改时间较新的图片文件");
+        deleteDuplicatedCheckBox = new JCheckBox("检测重复图片");
         deleteDuplicatedCheckBox.setBounds(asyArrangeCheckBox.getX(), generateFigTexFile.getY(), 120, Constants.COMPONENT_HEIGHT);
         listModel = new DefaultListModel<>();
         texFilesList = new JList<>(listModel);
@@ -125,6 +124,7 @@ final class SimpleTexProcessProgram {
         setToDefault();
         this.log = Logger.getLog();
         log.setLogField(logField);
+        Logger.setLogLevel(Logger.LOW);
     }
 
     public static void main(String[] args) {

@@ -90,7 +90,17 @@ class ProcessFiles implements Runnable {
             Logger.setLogLevel(Logger.LOW);
             if (needArrange) {
                 AsyFileArrange arrange = new AsyFileArrange(figureFolder);
-                if (deleteDuplicated) arrange.removeDuplicatedFilesByLastModified();
+                if (deleteDuplicated) {
+                    boolean flag = arrange.listDuplicateFiles();
+                    if (flag) {
+                        int result = JOptionPane.showConfirmDialog(mainWindow.getMainFrame(),
+                                "检测到重复的文件，是否删除重复文件，只保留同名文件中最后更新的文件？", "检测完成",
+                                JOptionPane.YES_NO_OPTION);
+                        if (result == JOptionPane.YES_OPTION) {
+                            arrange.removeDuplicatedFilesByLastModified();
+                        }
+                    }
+                }
                 arrange.arrangeAsyFiles();
             }
             ArrayList<File> inputRawTexFiles = getInputFiles();
