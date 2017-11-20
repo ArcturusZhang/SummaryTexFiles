@@ -1,8 +1,5 @@
 import java.io.*;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -13,6 +10,7 @@ class TexProcess {
     private static final Pattern chapterPattern = Pattern.compile("^(\\s*\\\\chapter)\\{([\\s\\S]+)\\}(\\s*)$");
     private static final Pattern sectionPattern = Pattern.compile("^(\\s*\\\\section)\\{(\\W+)\\}(\\s*)$");
     private static final Pattern subsectionPattern = Pattern.compile("^(\\s*\\\\subsection)\\{(\\W+)\\}(\\s*)$");
+    private static final Pattern tikzlibararyPattern = Pattern.compile("^\\\\usetikzlibrary\\{([\\s\\S]+)\\}");
     private final Logger log;
     private int warningCount = 0;
     private List<File> inputRawTexFiles;
@@ -20,6 +18,7 @@ class TexProcess {
     private File figureFolder;
     private File headerFile;
     private List<File> partFolders;
+    private Set<String> tikzLibraries = new HashSet<>();
 
     TexProcess(List<File> inputRawTexFiles, File mainFile, File figureFolder, File headerFile,
                List<File> partFolders) {
@@ -239,12 +238,21 @@ class TexProcess {
                 boolean flag = false;
                 boolean titled = false;
                 while ((line = reader.readLine()) != null) {
+                    // process tikz library inputting
+                    Matcher tikzlibraryMatcher = tikzlibararyPattern.matcher(line.trim());
+                    boolean isTikzFound = tikzlibraryMatcher.find();
+                    if (isTikzFound) {
+                        String libraries = tikzlibraryMatcher.group(1);
+                        for (String library : libraries.split(",")) {
+                            tikzLibraries.add(library.trim());
+                        }
+                    }
                     if (!titled && line.trim().startsWith("\\title")) {
                         titled = true;
                         writer.write(line.trim().replaceFirst("title", "chapter"));
                         writer.newLine();
                     }
-                    if (flag && !line.trim().startsWith("\\end{document}")) {
+                    if (flag && !line.trim().startsWith("\\end{document}") && !isTikzFound) {
                         writer.write(line);
                         writer.newLine();
                     }
@@ -381,7 +389,16 @@ class TexProcess {
                                 line = newline.toString();
                             }
                         }
-                        if (!line.trim().startsWith("\\input")) {
+                        // process tikz library inputting
+                        Matcher tikzlibraryMatcher = tikzlibararyPattern.matcher(line.trim());
+                        boolean isTikzFound = tikzlibraryMatcher.find();
+                        if (isTikzFound) {
+                            String libraries = tikzlibraryMatcher.group(1);
+                            for (String library : libraries.split(",")) {
+                                tikzLibraries.add(library.trim());
+                            }
+                        }
+                        if (!line.trim().startsWith("\\input") && !isTikzFound) {
                             content.append(line).append("\n");
                         }
                     }
@@ -420,6 +437,7 @@ class TexProcess {
      * @param trimmedTexMap trimmed files stored in a map by the folder it lies.
      */
     private void generateMainFile(Map<File, List<File>> trimmedTexMap) {
+        // get the contents that is to injected
         StringBuilder injectContent = new StringBuilder();
         for (File folder : partFolders) {
             for (File trimmedTexFile : trimmedTexMap.get(folder)) {
@@ -427,6 +445,12 @@ class TexProcess {
                         .append("}\n");
                 log.println("File: " + trimmedTexFile.getPath() + " injected into main file.", Logger.HIGH);
             }
+        }
+        // get all the tikz libraries that will be used in sub-files
+        StringBuilder usetikzlibrary = new StringBuilder();
+        if (!tikzLibraries.isEmpty()) {
+            String libraries = tikzLibraries.toString().replace("[", "").replace("]", "");
+            usetikzlibrary.append("\\usetikzlibrary{").append(libraries).append("}");
         }
         BufferedReader reader = null;
         BufferedWriter writer = null;
@@ -440,7 +464,14 @@ class TexProcess {
                     if (line.trim().startsWith("%!!!ContentEnd")) {
                         injectionFlag = true;
                     }
-                    if (injectionFlag) content.append(line).append("\n");
+                    if (injectionFlag) { // other content in main file goes here
+                        Matcher tikzLibraryMatcher = tikzlibararyPattern.matcher(line.trim());
+                        if (!tikzLibraryMatcher.find())
+                            content.append(line).append("\n"); // ignore the line "\\usetikzlibrary"
+                        if (line.trim().startsWith("\\begin{document}")) {
+                            content.append(usetikzlibrary).append("\n");
+                        }
+                    }
                     if (line.trim().startsWith("%!!!ContentStart")) {
                         content.append(injectContent);
                         injectionFlag = false;
