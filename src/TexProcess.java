@@ -378,10 +378,12 @@ class TexProcess {
                                     newSize = getWidth(Integer.valueOf(sizeMatcher.group(1))) + "cm";
                                 } else {
                                     // this file does not have size info
-                                    log.println("WARNING--picture file: " + picFile.getName()
-                                            + " does not have size info at line " + lineNumber
-                                            + " of file " + trimmedFile.getPath());
-                                    warningCount++;
+                                    if (!newFilePath.matches("tikz")) {
+                                        log.println("WARNING--picture file: " + picFile.getName()
+                                                + " does not have size info at line " + lineNumber
+                                                + " of file " + trimmedFile.getPath());
+                                        warningCount++;
+                                    }
                                     newSize = filenameMatcher.group(3);
                                 }
                                 newline.append(filenameMatcher.group(1)).append(newSize).append(filenameMatcher.group(4))
@@ -448,10 +450,10 @@ class TexProcess {
         }
         // get all the tikz libraries that will be used in sub-files
         StringBuilder usetikzlibrary = new StringBuilder();
-        if (!tikzLibraries.isEmpty()) {
-            String libraries = tikzLibraries.toString().replace("[", "").replace("]", "");
-            usetikzlibrary.append("\\usetikzlibrary{").append(libraries).append("}");
-        }
+//        if (!tikzLibraries.isEmpty()) {
+//            String libraries = tikzLibraries.toString().replace("[", "").replace("]", "");
+//            usetikzlibrary.append("\\usetikzlibrary{").append(libraries).append("}");
+//        } // do not need this any more
         BufferedReader reader = null;
         BufferedWriter writer = null;
         StringBuilder content = new StringBuilder();
